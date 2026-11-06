@@ -1,4 +1,4 @@
-import { LEAD_CAPTURE_TEXT, type StatusCopy } from "@evinvest/kitstart";
+import { LEAD_CAPTURE_TEXT, type StatusCopy } from "@/shared/lib/sites-tools";
 import type { Facts, Text } from "./types";
 
 const status = (code: string, title: string, headline: readonly [string, string], body: string): StatusCopy<Facts> => ({

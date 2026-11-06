@@ -1,4 +1,4 @@
-import { validateLead, type LeadFlows, type LeadSchema } from "@evinvest/kitstart";
+import { validateLead, type LeadFlows, type LeadSchema } from "@/shared/lib/sites-tools";
 
 export const SUBJECTS = ["standard", "deep", "other", "recurring"] as const;
 export type Subject = (typeof SUBJECTS)[number];

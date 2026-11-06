@@ -1,4 +1,4 @@
-import type { CopySlice, CoreText, LeadCaptureText, Said as CoreSaid } from "@evinvest/kitstart";
+import type { CopySlice, CoreText, LeadCaptureText, Said as CoreSaid } from "@/shared/lib/sites-tools";
 import type { Locale } from "@/shared/config/i18n";
 import type { Subject } from "@/shared/config/lead";
 import type { PageKey } from "@/shared/config/site";

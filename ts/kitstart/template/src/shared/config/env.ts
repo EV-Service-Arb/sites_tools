@@ -1,5 +1,5 @@
 import "server-only";
-import { createPlaceSource, createPricingSource, createServerEnv, leadNotifier, type LeadNotifier } from "@evinvest/kitstart/server";
+import { createPlaceSource, createPricingSource, createServerEnv, leadNotifier, type LeadNotifier } from "@/shared/lib/sites-tools/server";
 import { site } from "./site";
 
 /** Parsed once, lazily: `next build` imports this and must need no secrets. */

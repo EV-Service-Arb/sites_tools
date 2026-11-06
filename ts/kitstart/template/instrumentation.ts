@@ -7,7 +7,7 @@
 export async function register(): Promise<void> {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
   const { serverEnv, notifier } = await import("@/shared/config/env");
-  const { checkLeadStore } = await import("@evinvest/kitstart/server");
+  const { checkLeadStore } = await import("@/shared/lib/sites-tools/server");
   notifier();
   await checkLeadStore(serverEnv());
 }

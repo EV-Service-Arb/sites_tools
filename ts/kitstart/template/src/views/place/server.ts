@@ -1,5 +1,5 @@
 import "server-only";
-import { contactOf, type PlaceView } from "@evinvest/kitstart";
+import { contactOf, type PlaceView } from "@/shared/lib/sites-tools";
 import { copyFor, type Copy } from "@/entities/content";
 import { loadPlaceView } from "@/entities/place/server";
 import type { Locale } from "@/shared/config/i18n";

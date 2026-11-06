@@ -1,4 +1,4 @@
-import type { PricingModel } from "@evinvest/kitstart";
+import type { PricingModel } from "@/shared/lib/sites-tools";
 
 /**
  * The baked price list: what `recurring` is priced from until the panel

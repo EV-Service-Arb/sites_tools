@@ -1,4 +1,4 @@
-import { quoteRoute } from "@evinvest/kitstart/next";
+import { quoteRoute } from "@/shared/lib/sites-tools/next";
 import { TEXT } from "@/entities/content";
 import { notifier, pricing, serverEnv } from "@/shared/config/env";
 import { QA_COOKIE } from "@/shared/config/experiments";

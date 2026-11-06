@@ -1,5 +1,5 @@
-import { contactOf, placeGraph, type PlaceView, type PricingModel } from "@evinvest/kitstart";
-import { CallBar, Coverage, Display, Faq, JsonLd, LeadCapture, Section } from "@evinvest/kitstart/react";
+import { contactOf, placeGraph, type PlaceView, type PricingModel } from "@/shared/lib/sites-tools";
+import { CallBar, Coverage, Display, Faq, JsonLd, LeadCapture, Section } from "@/shared/lib/sites-tools/react";
 import type { Copy } from "@/entities/content";
 import type { Locale } from "@/shared/config/i18n";
 import { LEAD, PHOTO_NEEDS } from "@/shared/config/lead";

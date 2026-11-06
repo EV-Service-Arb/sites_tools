@@ -1,4 +1,4 @@
-import type { AbSwitcherExperiment } from "@evinvest/kitstart/react";
+import type { AbSwitcherExperiment } from "@/shared/lib/sites-tools/react";
 
 /**
  * The experiments the QA menu switches — a demo: the template's proxy runs

@@ -1,5 +1,5 @@
-import { contactOf, type PlaceView, type PricingModel } from "@evinvest/kitstart";
-import { LeadCapture } from "@evinvest/kitstart/react";
+import { contactOf, type PlaceView, type PricingModel } from "@/shared/lib/sites-tools";
+import { LeadCapture } from "@/shared/lib/sites-tools/react";
 import type { ReactNode } from "react";
 import type { Copy } from "@/entities/content";
 import type { Locale } from "@/shared/config/i18n";

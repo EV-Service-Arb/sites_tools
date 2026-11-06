@@ -1,4 +1,4 @@
-import { placeMetadata } from "@evinvest/kitstart/next";
+import { placeMetadata } from "@/shared/lib/sites-tools/next";
 import type { Metadata } from "next";
 import { loadPlace } from "@/views/place/server";
 import { pricing } from "@/shared/config/env";

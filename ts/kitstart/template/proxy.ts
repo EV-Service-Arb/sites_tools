@@ -1,4 +1,4 @@
-import { createProxy } from "@evinvest/kitstart/proxy";
+import { createProxy } from "@/shared/lib/sites-tools/proxy";
 import { site } from "@/shared/config/site";
 
 export const proxy = createProxy(site);

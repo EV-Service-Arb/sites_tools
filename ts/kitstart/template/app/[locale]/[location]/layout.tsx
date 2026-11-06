@@ -1,4 +1,4 @@
-import { AbSwitcher, AnalyticsBoundary } from "@evinvest/kitstart/react";
+import { AbSwitcher, AnalyticsBoundary } from "@/shared/lib/sites-tools/react";
 import type { ReactNode } from "react";
 import { loadPlace } from "@/views/place/server";
 import { serverEnv } from "@/shared/config/env";

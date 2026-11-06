@@ -1,6 +1,6 @@
-import { faqPageNode } from "@evinvest/kitstart";
-import { placeMetadata } from "@evinvest/kitstart/next";
-import { Faq, JsonLd, Section } from "@evinvest/kitstart/react";
+import { faqPageNode } from "@/shared/lib/sites-tools";
+import { placeMetadata } from "@/shared/lib/sites-tools/next";
+import { Faq, JsonLd, Section } from "@/shared/lib/sites-tools/react";
 import type { Metadata } from "next";
 import { loadPlace } from "@/views/place/server";
 import { EstimateCard } from "@/views/prices";

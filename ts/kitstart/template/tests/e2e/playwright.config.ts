@@ -1,5 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
-import { BREAKPOINTS } from "@evinvest/kitstart/testing/e2e";
+import { BREAKPOINTS } from "../../src/shared/lib/sites-tools/testing-e2e";
 
 // The standalone server under test, never `next dev`. Baselines are Linux's
 // (CI's); elsewhere the pixel comparison is skipped.
