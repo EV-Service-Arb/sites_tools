@@ -4,11 +4,12 @@
 
 use std::collections::BTreeMap;
 
+use ev_lib::i18n::LocaleRegistry;
+
 use super::{
 	place::{Place, PublicationField, PublicationPolicy},
 	routing::GONE,
 };
-use ev_lib::i18n::LocaleRegistry;
 
 /// The key of the page every place has.
 pub const HOME: &str = "home";

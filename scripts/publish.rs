@@ -240,7 +240,10 @@ fn main() -> ExitCode {
 		return ExitCode::SUCCESS;
 	}
 
-	let touched: Vec<&str> = ["ts/kitstart/package.json", "ts/kitstart/package-lock.json", TEMPLATE_MANIFEST].into_iter().chain(TAG_FILES.iter().copied()).collect();
+	let touched: Vec<&str> = ["ts/kitstart/package.json", "ts/kitstart/package-lock.json", TEMPLATE_MANIFEST]
+		.into_iter()
+		.chain(TAG_FILES.iter().copied())
+		.collect();
 	let restore: Vec<(&str, String)> = touched.iter().map(|f| (*f, std::fs::read_to_string(f).unwrap_or_else(|e| panic!("{f}: {e}")))).collect();
 	let undo = || {
 		for (path, text) in &restore {
@@ -287,7 +290,10 @@ fn main() -> ExitCode {
 	let tag = format!("{KITSTART}-v{version}");
 	let committed = try_run(Command::new("git").arg("add").arg("--").args(&touched)) && try_run(Command::new("git").args(["commit", "-m", "release: npm packages", "-m", &tag]));
 	if !committed || !try_run(Command::new("git").args(["tag", "-a", &tag, "-m", &tag])) {
-		eprintln!("!! the release commit or tag failed. Finish by hand: commit {}, `git tag -a {tag} -m {tag}`, push both.", touched.join(" "));
+		eprintln!(
+			"!! the release commit or tag failed. Finish by hand: commit {}, `git tag -a {tag} -m {tag}`, push both.",
+			touched.join(" ")
+		);
 		return ExitCode::FAILURE;
 	}
 	if !(try_run(Command::new("git").arg("push")) && try_run(Command::new("git").args(["push", &remote, &format!("refs/tags/{tag}")]))) {
@@ -329,7 +335,10 @@ mod tests {
 	#[test]
 	fn finds_tags_the_remote_lacks() {
 		let remote = "abc\trefs/tags/@evinvest/kitstart-v0.23.0\nabd\trefs/tags/@evinvest/kitstart-v0.23.0^{}\n";
-		assert_eq!(missing_tags("@evinvest/kitstart-v0.23.0\n@evinvest/kitstart-v0.24.0\n", remote), vec!["@evinvest/kitstart-v0.24.0"]);
+		assert_eq!(
+			missing_tags("@evinvest/kitstart-v0.23.0\n@evinvest/kitstart-v0.24.0\n", remote),
+			vec!["@evinvest/kitstart-v0.24.0"]
+		);
 	}
 
 	#[test]
