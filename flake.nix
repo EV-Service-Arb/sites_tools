@@ -16,7 +16,7 @@
 
           pname = "sites_tools";
 
-          # `nix run .#gen`: the kitstart contract the TS port reads, from the Rust core.
+          # `nix run .#gen`: the shared contract the TS port reads, from the Rust core.
           gen = pkgs.writeShellApplication {
             name = "gen";
             runtimeInputs = [ rust pkgs.git ];
@@ -33,7 +33,7 @@
                 generated = {
                   enable = true;
                   name = "regenerate derived files";
-                  entry = "bash -c '${gen}/bin/gen && git add -A ts/kitstart/src/generated'";
+                  entry = "bash -c '${gen}/bin/gen && git add -A ts/sites-tools/src/generated'";
                   pass_filenames = false;
                   require_serial = true;
                 };
@@ -77,7 +77,7 @@
 
           combined = v_flakes.utils.combine { inherit rust; modules = [ rs github readme ]; };
 
-          # `nix run .#publish -- <major|minor|patch>`: bump `@evinvest/kitstart`,
+          # `nix run .#publish -- <major|minor|patch>`: bump `@evinvest/sites-tools`,
           # move the template onto it, tag; the pushed tag is what CI publishes.
           publish = pkgs.writeShellApplication {
             name = "publish";
@@ -108,14 +108,14 @@
               quote = { location = "paris"; subject = "standard"; locality = "75011"; mobile = "0612345678"; };
             };
             containerAttr = ".#mk-landing-fixture-container";
-            # The stand-in builds no kitstart landing, so it locks no kitstart.
-            checkKitstartVersion = false;
+            # The stand-in builds no landing, so it locks no sites-tools.
+            checkSitesToolsVersion = false;
             # A package the registry does not have (its `resolved` 404s), served
             # from a vendored tarball — how a brand builds before a release.
             packageSourceOverrides."node_modules/fixture-vendored" = ./nix/mk-landing-fixture/vendor/fixture-vendored-1.0.0.tgz;
           };
 
-          # ── Visual regression (ts/kitstart/test/visual) ─────────────────────
+          # ── Visual regression (ts/sites-tools/test/visual) ─────────────────────
           # Every input the render reads is pinned here; the suite compares byte
           # for byte, so an unpinned input is a baseline that moves under whoever
           # runs next.
@@ -125,7 +125,7 @@
             in
             rec {
               # Not `makeFontsConf`: it includes /etc/fonts/conf.d, putting the host's fonts back in scope.
-              fontsConf = pkgs.writeText "kitstart-visual-fonts.conf" ''
+              fontsConf = pkgs.writeText "sites-tools-visual-fonts.conf" ''
                 <?xml version="1.0"?>
                 <!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">
                 <fontconfig>
@@ -153,9 +153,9 @@
           # The render is OS-sensitive, so capture is always a *-linux derivation.
           linuxSystem = builtins.replaceStrings [ "darwin" ] [ "linux" ] system;
 
-          kitstartSnapshotsFrom =
+          sitesToolsSnapshotsFrom =
             dist:
-            pkgs.runCommand "kitstart-visual-snapshots"
+            pkgs.runCommand "sites-tools-visual-snapshots"
               (
                 visual.env
                 // {
@@ -166,35 +166,35 @@
                 mkdir -p "$out" "$NIX_BUILD_TOP/run"
                 cd "$NIX_BUILD_TOP/run"
                 cp -r ${dist} dist
-                cp ${./ts/kitstart/test/visual/gallery.spec.ts} gallery.spec.ts
-                cp ${./ts/kitstart/test/visual/playwright.config.ts} playwright.config.ts
-                cp ${./ts/kitstart/test/visual/package.json} package.json
+                cp ${./ts/sites-tools/test/visual/gallery.spec.ts} gallery.spec.ts
+                cp ${./ts/sites-tools/test/visual/playwright.config.ts} playwright.config.ts
+                cp ${./ts/sites-tools/test/visual/package.json} package.json
                 ln -s ${visual.nodeModules} node_modules
-                export HOME="$NIX_BUILD_TOP" KITSTART_SNAPSHOT_OUT="$out"
+                export HOME="$NIX_BUILD_TOP" SITES_TOOLS_SNAPSHOT_OUT="$out"
                 playwright test
               '';
 
-          # Set by `kitstart-visual` below, via `nix store add-path`.
-          kitstartDistPath = builtins.getEnv "KITSTART_VISUAL_DIST";
+          # Set by `sites-tools-visual` below, via `nix store add-path`.
+          sitesToolsDistPath = builtins.getEnv "SITES_TOOLS_VISUAL_DIST";
 
-          kitstart-visual-app = pkgs.writeShellApplication {
-            name = "kitstart-visual";
+          sites-tools-visual-app = pkgs.writeShellApplication {
+            name = "sites-tools-visual";
             runtimeInputs = [ pkgs.nodejs pkgs.git pkgs.diffutils ];
             text = ''
-              cd "$(git rev-parse --show-toplevel)/ts/kitstart"
+              cd "$(git rev-parse --show-toplevel)/ts/sites-tools"
               shots=test/visual/__screenshots__
               [ -d node_modules ] || npm ci --ignore-scripts
-              KITSTART_VISUAL_OUT="$PWD/test/visual/dist" npx vitest run test/visual/gallery.node.test.tsx
+              SITES_TOOLS_VISUAL_OUT="$PWD/test/visual/dist" npx vitest run test/visual/gallery.node.test.tsx
               cp ${visual.tailwind} test/visual/dist/tailwind.js
 
-              dist=$(nix store add-path test/visual/dist --name kitstart-visual-dist)
-              out=$(KITSTART_VISUAL_DIST="$dist" nix build --impure --no-link --print-out-paths \
-                ".#packages.${linuxSystem}.kitstart-visual-snapshots")
+              dist=$(nix store add-path test/visual/dist --name sites-tools-visual-dist)
+              out=$(SITES_TOOLS_VISUAL_DIST="$dist" nix build --impure --no-link --print-out-paths \
+                ".#packages.${linuxSystem}.sites-tools-visual-snapshots")
 
               if [ "''${1-}" = "--update" ]; then
                 rm -f "$shots"/*.png
                 install -m644 "$out"/*.png "$shots"/
-                echo "kitstart baselines updated from $out"
+                echo "sites-tools baselines updated from $out"
               else
                 diff -rq --exclude=README.md "$out" "$shots"
               fi
@@ -206,17 +206,17 @@
             type = "app";
             program = "${pkgs.writeShellScriptBin "help" ''
               cat <<'EOF'
-              ${pname} — Service-Arb landing machinery: @evinvest/kitstart, its Rust core, lib.mkLanding
+              ${pname} — Service-Arb landing machinery: @evinvest/sites-tools, its Rust core, lib.mkLanding
 
               Commands:
                 nix develop                              dev shell (rust nightly, node, playwright, pre-commit)
-                nix run .#gen                            regenerate ts/kitstart/src/generated from the Rust core
-                nix run .#publish -- <major|minor|patch> bump + tag @evinvest/kitstart (CI publishes the tag)
-                nix run .#kitstart-visual [-- --update]  visual regression of the kitstart widget gallery
+                nix run .#gen                            regenerate ts/sites-tools/src/generated from the Rust core
+                nix run .#publish -- <major|minor|patch> bump + tag @evinvest/sites-tools (CI publishes the tag)
+                nix run .#sites-tools-visual [-- --update]  visual regression of the sites-tools widget gallery
                 nix run .#mk-landing-smoke               smoke the mk-landing fixture container (linux + docker)
                 nix build .#checks.<system>.mk-landing-budget   mk-landing bundle size gate
 
-              Docs: README.md, docs/ARCHITECTURE.md, ts/kitstart/README.md
+              Docs: README.md, docs/ARCHITECTURE.md, ts/sites-tools/README.md
               EOF
             ''}/bin/help";
           };
@@ -231,9 +231,9 @@
             program = "${gen}/bin/gen";
           };
 
-          apps.kitstart-visual = {
+          apps.sites-tools-visual = {
             type = "app";
-            program = "${kitstart-visual-app}/bin/kitstart-visual";
+            program = "${sites-tools-visual-app}/bin/sites-tools-visual";
           };
 
           # `lib.mkLanding` against a stand-in brand: the hermetic npm build from
@@ -250,14 +250,14 @@
           packages.mk-landing-fixture-container = mkLandingFixture.packages.container or mkLandingFixture.site;
           apps.mk-landing-smoke = mkLandingFixture.apps.container-smoke;
 
-          packages.kitstart-visual-snapshots =
-            if kitstartDistPath == "" then
-              pkgs.runCommand "kitstart-visual-snapshots-no-dist" { } ''
-                echo "KITSTART_VISUAL_DIST is unset — this is built through \`nix run .#kitstart-visual\`." >&2
+          packages.sites-tools-visual-snapshots =
+            if sitesToolsDistPath == "" then
+              pkgs.runCommand "sites-tools-visual-snapshots-no-dist" { } ''
+                echo "SITES_TOOLS_VISUAL_DIST is unset — this is built through \`nix run .#sites-tools-visual\`." >&2
                 exit 1
               ''
             else
-              kitstartSnapshotsFrom (builtins.storePath kitstartDistPath);
+              sitesToolsSnapshotsFrom (builtins.storePath sitesToolsDistPath);
 
           devShells.default =
             with pkgs;
@@ -288,7 +288,7 @@
       )
     // {
       # `sites_tools.lib.mkLanding { pkgs; root = ./.; pname; sitePort; buildFiles; … }`
-      # — the shared flake of every kitstart landing. See nix/mk-landing.nix.
+      # — the shared flake of every landing. See nix/mk-landing.nix.
       lib.mkLanding = import ./nix/mk-landing.nix;
     };
 }

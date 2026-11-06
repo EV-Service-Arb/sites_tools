@@ -21,7 +21,7 @@ edition = "2024"
 serde_json = "1"
 ---
 
-//! `nix run .#publish -- <major|minor|patch>`: bump `@evinvest/kitstart`, move
+//! `nix run .#publish -- <major|minor|patch>`: bump `@evinvest/sites-tools`, move
 //! the template onto it, commit and tag. npm takes no credential from here: the
 //! pushed tag runs `.github/workflows/release-npm.yml` (v_flakes `npmRelease`),
 //! which publishes through trusted publishing (OIDC).
@@ -64,7 +64,7 @@ fn changed(prefix: &str, paths: &[&str]) -> bool {
 }
 
 /// Does `range` admit `version`? The same slice of semver as
-/// ts/kitstart/scripts/semver.mjs — the one check-template holds the template to:
+/// ts/sites-tools/scripts/semver.mjs — the one check-template holds the template to:
 /// `^`, `>=`, `<=`, `>`, `<`, `=`/bare, `*`, AND by space, `||`. `None` for
 /// anything else, so an unreadable range is reported rather than guessed at.
 fn admits(range: &str, version: &str) -> Option<bool> {
@@ -135,9 +135,9 @@ fn bump_range(manifest: &str, name: &str, version: &str) -> Result<Option<String
 	Ok(Some(manifest.replacen(&from, &format!("\"{name}\": \"^{version}\""), 1)))
 }
 
-/// Point every `@evinvest/kitstart-v<x.y.z>` in `text` at `version`.
-fn retag_kitstart(text: &str, version: &str) -> String {
-	let marker = "@evinvest/kitstart-v";
+/// Point every `@evinvest/sites-tools-v<x.y.z>` in `text` at `version`.
+fn retag_pins(text: &str, version: &str) -> String {
+	let marker = "@evinvest/sites-tools-v";
 	let mut out = String::with_capacity(text.len());
 	let mut rest = text;
 	while let Some(at) = rest.find(marker) {
@@ -181,12 +181,12 @@ fn upstream_remote() -> Result<String, String> {
 	Ok(String::from_utf8_lossy(&remote.stdout).trim().to_owned())
 }
 
-const KITSTART: &str = "@evinvest/kitstart";
-const DIR: &str = "ts/kitstart";
-/// The brand scaffold kitstart ships names kitstart by range and sites_tools by
-/// kitstart's tag, so the release has to move both before the tarball is packed.
-const TEMPLATE_MANIFEST: &str = "ts/kitstart/template/package.json";
-const TAG_FILES: &[&str] = &["ts/kitstart/template/flake.nix", "ts/kitstart/README.md"];
+const PACKAGE: &str = "@evinvest/sites-tools";
+const DIR: &str = "ts/sites-tools";
+/// The brand scaffold the package ships names the package by range and sites_tools by
+/// sites-tools' tag, so the release has to move both before the tarball is packed.
+const TEMPLATE_MANIFEST: &str = "ts/sites-tools/template/package.json";
+const TAG_FILES: &[&str] = &["ts/sites-tools/template/flake.nix", "ts/sites-tools/README.md"];
 
 fn main() -> ExitCode {
 	let args: Vec<String> = std::env::args().skip(1).collect();
@@ -234,13 +234,13 @@ fn main() -> ExitCode {
 		}
 	}
 
-	// Brands pin `lib.mkLanding` by kitstart's tag, so `nix/` ships with kitstart.
-	if !changed(KITSTART, &[DIR, "nix"]) {
-		eprintln!("{KITSTART}: nothing changed since its last tag — nothing to release.");
+	// Brands pin `lib.mkLanding` by sites-tools' tag, so `nix/` ships with the package.
+	if !changed(PACKAGE, &[DIR, "nix"]) {
+		eprintln!("{PACKAGE}: nothing changed since its last tag — nothing to release.");
 		return ExitCode::SUCCESS;
 	}
 
-	let touched: Vec<&str> = ["ts/kitstart/package.json", "ts/kitstart/package-lock.json", TEMPLATE_MANIFEST]
+	let touched: Vec<&str> = ["ts/sites-tools/package.json", "ts/sites-tools/package-lock.json", TEMPLATE_MANIFEST]
 		.into_iter()
 		.chain(TAG_FILES.iter().copied())
 		.collect();
@@ -261,7 +261,7 @@ fn main() -> ExitCode {
 	// Into the template BEFORE the pack, or the tarball ships a scaffold that
 	// cannot install the very release it came in.
 	let manifest = std::fs::read_to_string(TEMPLATE_MANIFEST).expect("read template manifest");
-	match bump_range(&manifest, KITSTART, &version) {
+	match bump_range(&manifest, PACKAGE, &version) {
 		Ok(Some(next)) => std::fs::write(TEMPLATE_MANIFEST, next).expect("write template manifest"),
 		Ok(None) => {}
 		Err(e) => {
@@ -272,10 +272,10 @@ fn main() -> ExitCode {
 	}
 	for file in TAG_FILES {
 		let text = std::fs::read_to_string(file).expect("read pin file");
-		let next = retag_kitstart(&text, &version);
+		let next = retag_pins(&text, &version);
 		if next == text {
 			undo();
-			eprintln!("{file}: no `{KITSTART}-v<x.y.z>` pin to move — nothing was released.");
+			eprintln!("{file}: no `{PACKAGE}-v<x.y.z>` pin to move — nothing was released.");
 			return ExitCode::FAILURE;
 		}
 		std::fs::write(file, next).expect("write pin file");
@@ -287,7 +287,7 @@ fn main() -> ExitCode {
 		return ExitCode::FAILURE;
 	}
 
-	let tag = format!("{KITSTART}-v{version}");
+	let tag = format!("{PACKAGE}-v{version}");
 	let committed = try_run(Command::new("git").arg("add").arg("--").args(&touched)) && try_run(Command::new("git").args(["commit", "-m", "release: npm packages", "-m", &tag]));
 	if !committed || !try_run(Command::new("git").args(["tag", "-a", &tag, "-m", &tag])) {
 		eprintln!(
@@ -321,29 +321,29 @@ mod tests {
 
 	#[test]
 	fn the_real_template_moves_one_line() {
-		let real = include_str!("../ts/kitstart/template/package.json");
-		let next = bump_range(real, KITSTART, "99.0.0").unwrap().expect("kitstart in the template");
+		let real = include_str!("../ts/sites-tools/template/package.json");
+		let next = bump_range(real, PACKAGE, "99.0.0").unwrap().expect("the package in the template");
 		let changed: Vec<_> = real.lines().zip(next.lines()).filter(|(a, b)| a != b).collect();
 		assert_eq!(changed.len(), 1, "{changed:?}");
-		for file in [include_str!("../ts/kitstart/template/flake.nix"), include_str!("../ts/kitstart/README.md")] {
-			let next = retag_kitstart(file, "99.0.0");
+		for file in [include_str!("../ts/sites-tools/template/flake.nix"), include_str!("../ts/sites-tools/README.md")] {
+			let next = retag_pins(file, "99.0.0");
 			assert_eq!(next.lines().zip(file.lines()).filter(|(a, b)| a != b).count(), 1);
-			assert!(next.contains("@evinvest/kitstart-v99.0.0\""));
+			assert!(next.contains("@evinvest/sites-tools-v99.0.0\""));
 		}
 	}
 
 	#[test]
 	fn finds_tags_the_remote_lacks() {
-		let remote = "abc\trefs/tags/@evinvest/kitstart-v0.23.0\nabd\trefs/tags/@evinvest/kitstart-v0.23.0^{}\n";
+		let remote = "abc\trefs/tags/@evinvest/sites-tools-v0.23.0\nabd\trefs/tags/@evinvest/sites-tools-v0.23.0^{}\n";
 		assert_eq!(
-			missing_tags("@evinvest/kitstart-v0.23.0\n@evinvest/kitstart-v0.24.0\n", remote),
-			vec!["@evinvest/kitstart-v0.24.0"]
+			missing_tags("@evinvest/sites-tools-v0.23.0\n@evinvest/sites-tools-v0.24.0\n", remote),
+			vec!["@evinvest/sites-tools-v0.24.0"]
 		);
 	}
 
 	#[test]
-	fn retags_every_kitstart_reference() {
-		let text = "ref=@evinvest/kitstart-v0.3.0\";\n`@evinvest/kitstart-vX.Y.Z` tag.\n";
-		assert_eq!(retag_kitstart(text, "0.4.0"), "ref=@evinvest/kitstart-v0.4.0\";\n`@evinvest/kitstart-vX.Y.Z` tag.\n");
+	fn retags_every_pin() {
+		let text = "ref=@evinvest/sites-tools-v0.3.0\";\n`@evinvest/sites-tools-vX.Y.Z` tag.\n";
+		assert_eq!(retag_pins(text, "0.4.0"), "ref=@evinvest/sites-tools-v0.4.0\";\n`@evinvest/sites-tools-vX.Y.Z` tag.\n");
 	}
 }

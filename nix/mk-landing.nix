@@ -1,7 +1,7 @@
 # `lib.mkLanding`: everything a landing's flake.nix shares, ported from the
 # aquafix flake — the hermetic `next build` from package-lock.json, the OCI
 # image, the bundle-budget check, the container smoke, the dev/test apps and
-# the dev shell. A brand's flake.nix (see ts/kitstart/template/flake.nix):
+# the dev shell. A brand's flake.nix (see ts/sites-tools/template/flake.nix):
 #
 #   landing = sites_tools.lib.mkLanding {
 #     inherit pkgs v_flakes;
@@ -16,8 +16,8 @@
 #   packages = landing.packages; checks = landing.checks;
 #   apps = landing.apps; devShells.default = landing.devShell;
 #
-# The npm version of @evinvest/kitstart and the sites_tools revision move
-# together: pin the flake to the tag `@evinvest/kitstart-vX.Y.Z` of the version
+# The npm version of @evinvest/sites-tools and the sites_tools revision move
+# together: pin the flake to the tag `@evinvest/sites-tools-vX.Y.Z` of the version
 # in package-lock.json (checked below), with `inputs.v_flakes.follows`.
 { pkgs
 , # The brand repo's root (`./.` in its flake).
@@ -50,14 +50,14 @@
   smoke ? { page = "/fr"; }
 , # The flake attribute of the image the smoke boots.
   containerAttr ? ".#container"
-, # Refuse a lockfile whose @evinvest/kitstart is not this sites_tools revision's.
-  # Off only for a flake that builds no kitstart landing.
-  checkKitstartVersion ? true
+, # Refuse a lockfile whose @evinvest/sites-tools is not this sites_tools revision's.
+  # Off only for a flake that builds no landing.
+  checkSitesToolsVersion ? true
 , # Playwright's config for `apps.test` / `apps.accept-test`.
   e2eConfig ? "tests/e2e"
 , # Sources for lockfile entries the registry cannot serve yet — a `file:` or
   # vendored tarball of an unpublished @evinvest package — keyed like the
-  # lock (`"node_modules/@evinvest/kitstart" = ./vendor/kitstart.tgz;`). They
+  # lock (`"node_modules/@evinvest/sites-tools" = ./vendor/sites-tools.tgz;`). They
   # win over the platform pruning.
   packageSourceOverrides ? { }
 , # V8's old-space ceiling, in MiB. V8 collects lazily up to it, so it is what
@@ -76,11 +76,11 @@ let
   npmLock = lib.importJSON (root + "/package-lock.json");
 
   # ── the npm version ↔ this flake revision ──────────────────────────────
-  ownKitstart = (lib.importJSON ../ts/kitstart/package.json).version;
-  lockedKitstart = npmLock.packages."node_modules/@evinvest/kitstart".version or null;
+  ownVersion = (lib.importJSON ../ts/sites-tools/package.json).version;
+  lockedVersion = npmLock.packages."node_modules/@evinvest/sites-tools".version or null;
   versionOk =
-    lib.assertMsg (!checkKitstartVersion || lockedKitstart == ownKitstart)
-      "mkLanding: package-lock.json has @evinvest/kitstart ${toString lockedKitstart}, this sites_tools revision is ${ownKitstart} — pin the flake to the tag @evinvest/kitstart-v${toString lockedKitstart}";
+    lib.assertMsg (!checkSitesToolsVersion || lockedVersion == ownVersion)
+      "mkLanding: package-lock.json has @evinvest/sites-tools ${toString lockedVersion}, this sites_tools revision is ${ownVersion} — pin the flake to the tag @evinvest/sites-tools-v${toString lockedVersion}";
 
   # ── addresses: derived by devops, never typed ──────────────────────────
   consumes = lib.optionalAttrs connected {
@@ -159,10 +159,10 @@ let
   # ── the one hard gate ──────────────────────────────────────────────────
   # First-load JS of a place page against the brand's committed budget, on
   # the hermetic build: `nix flake check` warns over the target and fails past
-  # its tolerance (kitstart's README, "The bundle budget"). This revision's own
-  # copy of `kitstart-size`, run from source with type stripping.
-  sizeCli = ../ts/kitstart/src/cli;
-  sizeCmd = root: ''node --experimental-strip-types --disable-warning=ExperimentalWarning ${sizeCli}/kitstart-size.ts ${root} --route ${lib.escapeShellArg gatedRoute} --budget ${lib.escapeShellArg budgetFile}'';
+  # its tolerance (sites-tools' README, "The bundle budget"). This revision's own
+  # copy of `sites-tools-size`, run from source with type stripping.
+  sizeCli = ../ts/sites-tools/src/cli;
+  sizeCmd = root: ''node --experimental-strip-types --disable-warning=ExperimentalWarning ${sizeCli}/sites-tools-size.ts ${root} --route ${lib.escapeShellArg gatedRoute} --budget ${lib.escapeShellArg budgetFile}'';
   bundleBudget =
     pkgs.runCommand "${pname}-bundle-budget"
       {
@@ -189,7 +189,7 @@ let
         containers."" = {
           port = lib.toInt sitePort;
           inherit mounts criticality;
-          sqlite = lib.optional (prodEnv ? LEADS_DB_PATH) prodEnv.LEADS_DB_PATH; # kitstart's lead store; LEADS_DB_URL is remote
+          sqlite = lib.optional (prodEnv ? LEADS_DB_PATH) prodEnv.LEADS_DB_PATH; # sites-tools' lead store; LEADS_DB_URL is remote
           healthPath = "/health";
           entrypoint = [
             "${nodeRuntime}/bin/node"
@@ -292,7 +292,7 @@ let
     '';
   };
 
-  # The `@figma` frames (kitstart's `defineFigmaSuite`): `frames` lists their
+  # The `@figma` frames (sites-tools' `defineFigmaSuite`): `frames` lists their
   # keys; with `FIGMA_CAPTURES` set, the requested ones are captured.
   runFigma = pkgs.writeShellApplication {
     name = "${pname}-figma";

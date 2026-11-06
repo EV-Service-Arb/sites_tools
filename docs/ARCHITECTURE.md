@@ -9,10 +9,10 @@
 
 ```
 sites_tools/
-├── ts/kitstart/          npm @evinvest/kitstart: core · react · next · server · proxy · testing · cli
+├── ts/sites-tools/          npm @evinvest/sites-tools: core · react · next · server · proxy · testing · cli
 │   └── template/         the brand scaffold the tarball ships
 ├── rust/                 crate `kitstart` (publish = false): the pure core, deps ev_lib[i18n]
-├── gen/                  `nix run .#gen` → ts/kitstart/src/generated/contract.ts
+├── gen/                  `nix run .#gen` → ts/sites-tools/src/generated/contract.ts
 ├── tests/fixtures/kitstart/   vectors both ports run
 ├── nix/                  lib.mkLanding · its stand-in brand · the container smoke
 └── scripts/publish.rs    `nix run .#publish`
@@ -33,8 +33,8 @@ sites_tools/
   as serialised text by `rust/src/tests.rs` and the TS suite; key order is part
   of the contract.
 - **A brand pins one release.** `lib.mkLanding` refuses a lockfile whose
-  `@evinvest/kitstart` is not this revision's `ts/kitstart/package.json`, so a
-  brand's flake input is the `@evinvest/kitstart-vX.Y.Z` tag of its npm version.
+  `@evinvest/sites-tools` is not this revision's `ts/sites-tools/package.json`, so a
+  brand's flake input is the `@evinvest/sites-tools-vX.Y.Z` tag of its npm version.
 
 ## The Rust core
 
@@ -47,6 +47,6 @@ take.
 ## Publishing
 
 `nix run .#publish -- <level>` bumps the package, moves the template's
-kitstart range and `@evinvest/kitstart-v…` pins, commits and tags; the tag
-fires `release-npm.yml` (v_flakes `npmRelease`). `kitstart-registry.yml` then
+the package's range and `@evinvest/sites-tools-v…` pins, commits and tags; the tag
+fires `release-npm.yml` (v_flakes `npmRelease`). `sites-tools-registry.yml` then
 builds the template from npm, and weekly.

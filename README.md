@@ -1,7 +1,7 @@
 # sites_tools
 ![Minimum Supported Rust Version](https://img.shields.io/badge/nightly-1.92+-ab6000.svg)
 
-Service-Arb's landing machinery: `@evinvest/kitstart` (the TypeScript a brand's
+Service-Arb's landing machinery: `@evinvest/sites-tools` (the TypeScript a brand's
 Next site is built from), its pure Rust core, and `lib.mkLanding`, the flake
 every brand's `flake.nix` is one call to.
 <!-- markdownlint-disable -->
@@ -10,9 +10,9 @@ every brand's `flake.nix` is one call to.
 <h2>Installation</h2>
 </summary>
 
-A new brand starts from [`ts/kitstart/template/`](ts/kitstart/template/): copy
+A new brand starts from [`ts/sites-tools/template/`](ts/sites-tools/template/): copy
 it, `npm install`, and follow its README. Its `flake.nix` pins this repo at the
-`@evinvest/kitstart-vX.Y.Z` tag of the npm version it locks.
+`@evinvest/sites-tools-vX.Y.Z` tag of the npm version it locks.
 
 
 </details>
@@ -23,8 +23,8 @@ it, `npm install`, and follow its README. Its `flake.nix` pins this repo at the
 
 | Path | What |
 | ---- | ---- |
-| [`ts/kitstart/`](ts/kitstart/) | `@evinvest/kitstart` on npm; its README is the manual |
-| [`ts/kitstart/template/`](ts/kitstart/template/) | the brand scaffold the package ships |
+| [`ts/sites-tools/`](ts/sites-tools/) | `@evinvest/sites-tools` on npm; its README is the manual |
+| [`ts/sites-tools/template/`](ts/sites-tools/template/) | the brand scaffold the package ships |
 | [`rust/`](rust/) | crate `kitstart`: the pure core, pinned to the TS port by `tests/fixtures/kitstart/` |
 | [`gen/`](gen/) | `nix run .#gen`: the TS contract, from the Rust core |
 | [`nix/`](nix/) | `lib.mkLanding` |

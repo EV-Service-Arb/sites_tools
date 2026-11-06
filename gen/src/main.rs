@@ -1,4 +1,4 @@
-//! The repo's one generator: the kitstart contract the TS port reads, from the
+//! The repo's one generator: the shared contract the TS port reads, from the
 //! Rust core. Run via `nix run .#gen`; the `generated` pre-commit hook re-runs it.
 
 use std::path::Path;
@@ -7,7 +7,7 @@ use ev_lib::ts_gen::Ts;
 
 fn main() {
 	let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-	Ts::write(&root.join("ts/kitstart/src/generated/contract.ts"), &contract());
+	Ts::write(&root.join("ts/sites-tools/src/generated/contract.ts"), &contract());
 }
 
 fn contract() -> Vec<Ts> {

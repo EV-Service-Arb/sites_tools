@@ -1,1 +1,1 @@
-<!-- The manual is ts/kitstart/README.md. -->
+<!-- The manual is ts/sites-tools/README.md. -->
