@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["rust", "gen"]
+members = ["gen", "rust"]
 
 [workspace.dependencies]
 ev_lib = "0.30"
