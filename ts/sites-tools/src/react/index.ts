@@ -78,4 +78,4 @@ export {
 } from "@evinvest/uikit";
 export { JsonLd } from "@evinvest/marketing";
 export { ClickToLoad } from "@evinvest/marketing/click-to-load";
-export { ContactLinkTracker } from "@evinvest/marketing/tracker";
+export { ContactLinkTracker, type ContactClick, type ContactLinkTrackerProps } from "./ContactLinkTracker";

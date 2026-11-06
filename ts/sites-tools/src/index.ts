@@ -329,13 +329,6 @@ export { brandStatusTarget, statusTarget, thanksChannel, thanksSuffix, type Stat
 // A landing needs these beside the machinery; re-exported by name so a brand
 // imports one package and the list here is the whole surface.
 export { createLocaleRegistry, type LocaleRegistry } from "@evinvest/i18n";
-export {
-  contactChannel,
-  ldCompact,
-  localBusiness,
-  telHref,
-  whatsappHref,
-  type ContactChannel,
-  type JsonLdNode,
-} from "@evinvest/marketing";
+export { ldCompact, localBusiness, type JsonLdNode } from "@evinvest/marketing";
+export { contactChannel, telHref, whatsappHref, type ContactChannel } from "./core/contact";
 export { createBeaconSink, noopSink, type AnalyticsSink } from "@evinvest/analytics";

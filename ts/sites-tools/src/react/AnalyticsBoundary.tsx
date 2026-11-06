@@ -1,6 +1,6 @@
 "use client";
 
-import { ContactLinkTracker } from "@evinvest/marketing/tracker";
+import { ContactLinkTracker } from "./ContactLinkTracker";
 import { usePathname } from "next/navigation.js";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { analyticsSink, channelsProps, countsAsPageView, EVENTS, experimentProps, type AnalyticsTarget, type IntentChannel } from "../core/analytics";

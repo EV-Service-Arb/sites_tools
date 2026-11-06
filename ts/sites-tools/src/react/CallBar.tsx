@@ -1,4 +1,4 @@
-import { telHref, whatsappHref } from "@evinvest/marketing";
+import { telHref, whatsappHref } from "../core/contact";
 import { Button, cn } from "@evinvest/uikit";
 import { resolveChannels, type CaptureChannel } from "../core/channels";
 import type { CallBarText, CopySlice } from "../core/content";

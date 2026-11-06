@@ -1,5 +1,5 @@
 import { cn } from "@evinvest/uikit";
-import { telHref } from "@evinvest/marketing";
+import { telHref } from "../core/contact";
 import type { ReactNode } from "react";
 import { storefrontOf, type Place } from "../core/place/types";
 import { partWithLeading, type PartClassNames } from "./parts";

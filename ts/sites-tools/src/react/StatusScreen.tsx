@@ -1,4 +1,4 @@
-import { telHref } from "@evinvest/marketing";
+import { telHref } from "../core/contact";
 import { Button, Check, cn } from "@evinvest/uikit";
 import type { ReactNode } from "react";
 import type { CopySlice, StatusAction, StatusCopy, StatusScreenText } from "../core/content";

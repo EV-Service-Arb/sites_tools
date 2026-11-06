@@ -1,4 +1,4 @@
-import { telHref, whatsappHref } from "@evinvest/marketing";
+import { telHref, whatsappHref } from "./contact";
 import { DEFAULT_TIME_ZONE, isOpenAt, nextOpening, type Opening } from "./place/hours";
 import type { OpeningHours } from "./place/types";
 import { telegramHref } from "./messenger";

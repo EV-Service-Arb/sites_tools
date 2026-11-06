@@ -1,6 +1,6 @@
 "use client";
 
-import { whatsappHref } from "@evinvest/marketing";
+import { whatsappHref } from "../../core/contact";
 import { Badge, Button, cn, Select, SelectContent, SelectItem, SelectTrigger } from "@evinvest/uikit";
 import { useEffect, useId, useRef, useState, useSyncExternalStore, type MouseEvent, type ReactNode } from "react";
 import { fillText } from "../../core/lead-capture-format";
