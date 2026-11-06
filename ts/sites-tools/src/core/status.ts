@@ -1,4 +1,5 @@
-import { CHANNEL_FIELD, type LeadChannel } from "./lead";
+import { CHANNEL_FIELD } from "./lead";
+import type { SiteChannel } from "@evinvest/sites-contract";
 import { createPlaceView } from "./place/view";
 import type { Place } from "./place/types";
 import { parsePlaceParam, THANKS } from "./routing";
@@ -25,7 +26,7 @@ export interface StatusTarget<L extends string> {
  * The thanks page's suffix: a callback's carries `?channel=callback`, so the
  * page can promise a call instead of the quote's SMS.
  */
-export function thanksSuffix(channel: LeadChannel = "form"): string {
+export function thanksSuffix(channel: SiteChannel = "form"): string {
   return channel === "callback" ? `${THANKS}?${CHANNEL_FIELD}=callback` : THANKS;
 }
 
@@ -33,7 +34,7 @@ export function thanksSuffix(channel: LeadChannel = "form"): string {
  * Which lead the thanks page thanks for, from its query — a page's
  * `searchParams` or a `URLSearchParams`. Anything but `callback` is `form`.
  */
-export function thanksChannel(search: URLSearchParams | Readonly<Record<string, string | string[] | undefined>>): LeadChannel {
+export function thanksChannel(search: URLSearchParams | Readonly<Record<string, string | string[] | undefined>>): SiteChannel {
   const raw = search instanceof URLSearchParams ? search.get(CHANNEL_FIELD) : search[CHANNEL_FIELD];
   const value = Array.isArray(raw) ? raw[0] : raw;
   return value === "callback" ? "callback" : "form";
@@ -51,7 +52,7 @@ function complete<L extends string>(r: Partial<Record<L, string>>, locales: read
 export function brandStatusTarget<L extends string>(
   facts: { locales: readonly L[]; phone: string | null },
   locale: L,
-  options: { retry?: string; thanks?: boolean; channel?: LeadChannel } = {},
+  options: { retry?: string; thanks?: boolean; channel?: SiteChannel } = {},
 ): StatusTarget<L> {
   const suffix = options.thanks ? thanksSuffix(options.channel) : "";
   const langHrefs: Partial<Record<L, string>> = {};
@@ -80,7 +81,7 @@ export function brandStatusTarget<L extends string>(
 export function statusTarget<L extends string, P extends string>(
   site: Site<L, P>,
   params: { locale?: string | string[] | undefined; location?: string | string[] | undefined },
-  options: { retry?: string; thanks?: boolean; channel?: LeadChannel } = {},
+  options: { retry?: string; thanks?: boolean; channel?: SiteChannel } = {},
 ): StatusTarget<L> {
   const locale = typeof params.locale === "string" && site.i18n.isLocale(params.locale) ? params.locale : site.i18n.defaultLocale;
   const suffix = options.thanks ? thanksSuffix(options.channel) : "";

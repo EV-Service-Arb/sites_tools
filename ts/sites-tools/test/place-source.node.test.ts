@@ -21,21 +21,23 @@ const bySlug = (answer: (slug: string) => Response | Promise<Response>) =>
 
 describe("one place from the live source", () => {
   it("merges live fields over the baked ones, asking with the locale and a TTL", async () => {
-    const fetch = vi.fn(async (_input: string | URL | Request, _init?: RequestInit) => Response.json({ phone: "+33 4 11 11 11 11", serviceArea: ["Royat"] }));
+    const fetch = vi.fn(async (_input: string | URL | Request, _init?: RequestInit) => Response.json({ phone: "+33411111111", serviceArea: ["Royat"] }));
     vi.stubGlobal("fetch", fetch);
     const place = await live().getPlace("royat", "en");
-    expect(place?.channels.phone).toBe("+33 4 11 11 11 11");
+    expect(place?.channels.phone).toBe("+33411111111");
     expect(place && storefrontOf(place)?.address.postalCode).toBe("63130");
     expect(String(fetch.mock.calls[0]?.[0])).toBe("https://panel.example/api/internal/brands/aquafix/locations/royat?locale=en");
     expect(fetch.mock.calls[0]?.[1]).toMatchObject({ cache: "force-cache", next: { revalidate: 600 } });
   });
 
-  it("takes the place's booking, held to the site's Cal.com hosts", async () => {
-    const own = { default: "cal_com", providers: { cal_com: { url: "https://cal.brand.fr/brand/menage" } } };
-    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ booking: own })));
+  it("takes the place's booking when the panel's rules do, and says what it kept baked", async () => {
+    const theirs = { default: "cal_com", providers: { cal_com: { url: "https://cal.brand.fr/brand/menage" } } };
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ booking: theirs })));
     expect((await live().getPlace("royat", "fr"))?.booking).toBeUndefined();
-    const ownHosts = createPlaceSource({ ...site, booking: { calComHosts: ["cal.brand.fr"] } }, { log });
-    expect((await ownHosts.getPlace("royat", "fr"))?.booking).toEqual(own);
+    expect(log.error).toHaveBeenCalledWith("live place royat: kept baked for booking.providers.cal_com.url cal_host");
+    const ours = { default: "cal_com", providers: { cal_com: { url: "https://cal.com/brand/menage" } } };
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ booking: ours })));
+    expect((await live().getPlace("royat", "fr"))?.booking).toEqual(ours);
   });
 
   it("turns the source's own 404 (its JSON) or a 410 into a missing place", async () => {

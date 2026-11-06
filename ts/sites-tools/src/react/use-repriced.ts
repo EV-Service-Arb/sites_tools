@@ -4,7 +4,7 @@ import { useState } from "react";
 import { PRICE_CHANGED } from "../core/accept";
 import { fillText, formatCents } from "../core/lead-capture-format";
 import type { LeadCaptureFlowText } from "../core/lead-capture-text";
-import type { Price } from "../core/pricing/model";
+import type { Price } from "@evinvest/sites-contract";
 
 /**
  * The price the server answered when the one on screen was stale

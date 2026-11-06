@@ -1,6 +1,5 @@
 import "server-only";
-import { randomBytes } from "node:crypto";
-import { EXPERIMENT_SLUG } from "../core/analytics";
+import { declarationProblem, ingestBody, siteEvent, uuidV7, type ExperimentDeclaration, type IngestRequest } from "@evinvest/sites-contract";
 import type { LeadWebhook } from "./lead-webhook";
 
 /**
@@ -16,64 +15,6 @@ export interface DeclaredExperiment {
 }
 
 export type ExperimentsDeclaration = Readonly<Record<string, DeclaredExperiment>>;
-
-/**
- * `ExperimentDeclaration` of the panel's `experiments.declared@1`. `weights`
- * stays in the contract; the code always sends one each (the equal split it
- * runs without an override).
- */
-export interface ExperimentDeclarationV1 {
-  key: string;
-  variants: string[];
-  weights: number[];
-  enabled: boolean;
-  holdout?: number;
-  summary?: string;
-}
-
-/** `experiments.declared@1` as protojson: `sa.v1.Event` with `ExperimentsDeclaredV1` for properties. */
-export interface ExperimentsDeclaredEvent {
-  id: string;
-  schema: "sa.funnel.v1";
-  type: "experiments.declared";
-  typeVersion: 1;
-  occurredAt: string;
-  source: { kind: "site"; id: string };
-  subject: { brandId: string };
-  properties: { experiments: ExperimentDeclarationV1[] };
-}
-
-const KEY = /^[a-z0-9_]{1,64}$/;
-const MAX_SUMMARY = 200;
-
-/**
- * Why the panel would refuse this experiment, or `null`. The panel judges the
- * event whole, so one bad experiment would lose the brand's declaration:
- * it is left out instead, and said so at start.
- */
-export function declarationProblem(key: string, spec: DeclaredExperiment, summary: string | undefined): string | null {
-  if (!KEY.test(key)) return "the key is not [a-z0-9_]{1,64}";
-  if (spec.variants.length < 2) return "fewer than two variants";
-  if (new Set(spec.variants).size !== spec.variants.length) return "a variant is declared twice";
-  if (!spec.variants.every(v => EXPERIMENT_SLUG.test(v))) return "a variant is not a slug ([a-z0-9_-]{1,32})";
-  if (spec.holdout !== undefined && !(Number.isFinite(spec.holdout) && spec.holdout >= 0 && spec.holdout < 1)) return "the holdout is not in [0, 1)";
-  if (summary !== undefined && summary.length > MAX_SUMMARY) return `the summary is over ${MAX_SUMMARY} characters`;
-  return null;
-}
-
-/** RFC 9562 UUIDv7: the panel refuses any other version for an event id. */
-export function uuidV7(nowMs: number): string {
-  const bytes = randomBytes(16);
-  let ms = nowMs;
-  for (let i = 5; i >= 0; i--) {
-    bytes[i] = ms % 256;
-    ms = Math.floor(ms / 256);
-  }
-  bytes[6] = ((bytes[6] ?? 0) & 0x0f) | 0x70;
-  bytes[8] = ((bytes[8] ?? 0) & 0x3f) | 0x80;
-  const hex = bytes.toString("hex");
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
-}
 
 export interface DeclarationContext {
   brandId: string;
@@ -92,36 +33,25 @@ export interface DeclarationContext {
 export function experimentsDeclaredBody(
   experiments: ExperimentsDeclaration,
   ctx: DeclarationContext,
-): { body: { events: [ExperimentsDeclaredEvent] }; skipped: { key: string; why: string }[] } {
-  const declared: ExperimentDeclarationV1[] = [];
+): { body: IngestRequest; skipped: { key: string; why: string }[] } {
+  const declared: ExperimentDeclaration[] = [];
   const skipped: { key: string; why: string }[] = [];
   for (const [key, spec] of Object.entries(experiments)) {
     const summary = ctx.summaries && Object.hasOwn(ctx.summaries, key) ? ctx.summaries[key] : undefined;
-    const why = declarationProblem(key, spec, summary);
-    if (why !== null) {
-      skipped.push({ key, why });
-      continue;
-    }
-    declared.push({
+    const declaration: ExperimentDeclaration = {
       key,
       variants: [...spec.variants],
       weights: spec.variants.map(() => 1),
       enabled: spec.enabled ?? true,
       ...(spec.holdout !== undefined ? { holdout: spec.holdout } : {}),
-      ...(summary !== undefined && summary !== "" ? { summary } : {}),
-    });
+      ...(summary !== undefined && summary.trim() !== "" ? { summary } : {}),
+    };
+    const why = declarationProblem(declaration);
+    if (why === null) declared.push(declaration);
+    else skipped.push({ key, why });
   }
-  const event: ExperimentsDeclaredEvent = {
-    id: uuidV7(ctx.at.getTime()),
-    schema: "sa.funnel.v1",
-    type: "experiments.declared",
-    typeVersion: 1,
-    occurredAt: ctx.at.toISOString(),
-    source: { kind: "site", id: ctx.sourceId },
-    subject: { brandId: ctx.brandId },
-    properties: { experiments: declared },
-  };
-  return { body: { events: [event] }, skipped };
+  const head = { id: uuidV7(ctx.at.getTime()), occurredAt: ctx.at, sourceId: ctx.sourceId, subject: { brandId: ctx.brandId } };
+  return { body: ingestBody(siteEvent("experiments.declared@1", head, { experiments: declared })), skipped };
 }
 
 /** What `declareExperiments` did: queued (`row`), or why not. */
@@ -162,7 +92,7 @@ export function declareExperiments(
     log.error("experiments: the lead webhook could not be built, nothing declared to the panel", error);
     return { kind: "failed" };
   }
-  if (!hook?.declareExperiments) return { kind: "off" };
+  if (!hook) return { kind: "off" };
   let outcome: DeclareOutcome;
   try {
     outcome = hook.declareExperiments(experiments, options.summaries ?? {});

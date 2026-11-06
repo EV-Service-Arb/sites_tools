@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createExperimentsSource, parseExperimentOverrides } from "../src/server/index";
+import { createExperimentsSource } from "../src/server/index";
 
 const site = { brand: { id: "vifnet" } };
 const log = { error: vi.fn() };
@@ -116,25 +116,5 @@ describe("the experiments source", () => {
     clock = 500;
     await s.overrides();
     expect(fetch).toHaveBeenCalledTimes(1);
-  });
-});
-
-describe("parseExperimentOverrides", () => {
-  it("keeps fields of the right type and drops the rest", () => {
-    expect(
-      parseExperimentOverrides({
-        experiments: {
-          a: { enabled: "no", weights: [1, "2"], holdout: 0.2 },
-          b: { weights: [0, 1], extra: true },
-          c: null,
-          d: 3,
-        },
-      }),
-    ).toEqual({ a: { holdout: 0.2 }, b: { weights: [0, 1] } });
-  });
-
-  it("is {} for the panel's empty answer and null for anything else", () => {
-    expect(parseExperimentOverrides({ experiments: {} })).toEqual({});
-    for (const body of [null, [], "x", {}, { experiments: null }, { experiments: [] }]) expect(parseExperimentOverrides(body)).toBeNull();
   });
 });

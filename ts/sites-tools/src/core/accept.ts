@@ -1,9 +1,8 @@
 import { ANALYTICS_ID, experimentProps } from "./analytics";
 import { HONEYPOT_FIELD, LEGACY_HONEYPOT_FIELDS, RENDERED_AT_FIELD, screen, type RateLimiter } from "./antispam";
-import { channelOf, isMessengerChannel, MAX_FIELD, readCandidate, validateCandidate, type Lead, type LeadCandidate, type LeadChannel, type LeadPrice } from "./lead";
-import { answeredUnknown, flowOf, readEstimateInputs, type LeadFlow } from "./pricing/flow";
-import type { PricingModel } from "./pricing/model";
-import { priceOf } from "./pricing/price";
+import { channelOf, isMessengerChannel, MAX_FIELD, readCandidate, validateCandidate, type Lead, type LeadCandidate, type LeadPrice } from "./lead";
+import { priceOf, type LeadFlow, type PricingModel, type SiteChannel } from "@evinvest/sites-contract";
+import { answeredUnknown, flowOf, readEstimateInputs } from "./pricing/flow";
 import type { ChannelsAvailable } from "./messenger";
 import type { Site } from "./site";
 
@@ -64,7 +63,7 @@ export type Outcome<L extends string> =
    * `field` names what to fix (`phone`, `consent`, … or `form`); `why` is for
    * the log. `cents`: with `price_changed`, the price the lead would be taken at now.
    */
-  | { kind: "invalid"; why: string; field: string; channel: LeadChannel; formId: string; locale: L; slug: string | null; cents?: number }
+  | { kind: "invalid"; why: string; field: string; channel: SiteChannel; formId: string; locale: L; slug: string | null; cents?: number }
   | { kind: "failed"; locale: L; slug: string | null };
 
 export interface AcceptDeps {
@@ -80,19 +79,13 @@ export interface AcceptDeps {
    * answer, where a crash cannot drop it; a lead the notifier skips is skipped
    * here too. A failure logs and changes nothing — the lead is stored.
    */
-  enqueue?: (lead: Lead, id: number, meta: { locale: string; formId: string; leadRef: string; analyticsId?: string }) => void;
+  enqueue?: (lead: Lead, id: number, meta: { leadRef: string; analyticsId?: string }) => void;
   /**
    * The price list to price an `estimate` or `fixed` lead with
    * (`createPricingSource(…).model`); absent → `site.pricing`. A failure is
    * no model: the lead is kept as a `quote`, never refused.
    */
   pricing?: () => Promise<PricingModel | null>;
-  /**
-   * Queue a rate-limited lead too, for the panel to show as suspect
-   * (`LeadWebhookOptions.panelSuspect`). Off: it waits in the table, as before.
-   * It is never mailed; a honeypot lead is never sent anywhere.
-   */
-  sendSuspect?: boolean;
   capture: (lead: Lead, formId: string, tags: SubmitTags) => void;
   limiter: RateLimiter;
   now: number;
@@ -113,9 +106,8 @@ function tag(seed: string): string {
 
 /**
  * The lead's public reference, `lead-<row>-<8 hex>`: the one the script's
- * answer gives the page (`LeadSent.lead`) and the webhook offers the panel
- * (`LeadWebhookContext.leadRef`), so whatever the page does next — a booking,
- * once there is a provider — can name its lead. The
+ * answer gives the page (`LeadSent.lead`) and `lead.created` names the lead
+ * by, so whatever the page does next — a booking — can name its lead. The
  * row id for a person matching it to the mail; the tag because row ids start
  * over if the leads file is ever recreated. Seeded by the submission id when
  * there is one, so a resend is answered with the same reference.
@@ -263,13 +255,15 @@ async function accept<L extends string, P extends string>(
   const queue = () => {
     if (!deps.enqueue) return;
     try {
-      deps.enqueue(lead, id, { locale, formId, leadRef: ref, ...(analyticsId ? { analyticsId } : {}) });
+      deps.enqueue(lead, id, { leadRef: ref, ...(analyticsId ? { analyticsId } : {}) });
     } catch (error) {
       deps.log.error(`quote: lead ${id} is stored but could not be queued for its webhook`, error);
     }
   };
   if (lead.spamVerdict && lead.spamVerdict !== "too-fast") {
-    const marked = lead.spamVerdict === "rate-limited" && deps.sendSuspect === true;
+    // A rate-limited lead may be a person: the panel shows it, marked suspect. It is never
+    // mailed; a honeypot lead is never sent anywhere.
+    const marked = lead.spamVerdict === "rate-limited" && deps.enqueue !== undefined;
     deps.log.warn(`quote: lead ${id} stored as suspected spam (${lead.spamVerdict}); not notified${marked ? ", queued marked suspect" : ""}`);
     if (marked) queue();
     return { kind: "stored", id, ref, lead, locale, formId };

@@ -1,6 +1,5 @@
 import "server-only";
-import type { PricingModel } from "../core/pricing/model";
-import { parsePricingModel, pricingProblemsFor } from "../core/pricing/validate";
+import { checkPricingModel, type PricingModel } from "@evinvest/sites-contract";
 import type { Site } from "../core/site";
 import { sitesPanelBrand } from "./env";
 import { isEmptyObject, unreachable, type Down } from "./fetched";
@@ -49,9 +48,9 @@ export async function fetchPricing<L extends string, P extends string>(site: Sit
     return { kind: "down", detail: "not JSON", cause };
   }
   if (isEmptyObject(body)) return { kind: "empty" };
-  const problems = pricingProblemsFor(body, site.i18n.locales);
-  if (problems.length > 0) return { kind: "down", detail: `model refused whole (${problems.slice(0, 5).join("; ")})` };
-  return { kind: "live", model: parsePricingModel(body) };
+  const { problems, model } = checkPricingModel(body, site.i18n.locales);
+  if (!model) return { kind: "down", detail: `model refused whole (${problems.slice(0, 5).map(p => `${p.path} ${p.code}`).join("; ")})` };
+  return { kind: "live", model };
 }
 
 export function createPricingSource<L extends string, P extends string>(site: Site<L, P>, options: PricingSourceOptions = {}): PricingSource {

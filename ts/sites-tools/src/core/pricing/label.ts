@@ -1,4 +1,4 @@
-import type { PricingLabels } from "./model";
+import type { PricingLabels } from "@evinvest/sites-contract";
 
 /**
  * The label for `locale`, or the first one the model has. Apart from the

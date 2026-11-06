@@ -1,19 +1,17 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { LEAD_CAPTURE_TEXT, parsePricingModel, type OpeningHours, type Place } from "../src/index";
+import { LEAD_CAPTURE_TEXT, type OpeningHours, type Place } from "../src/index";
 import { AnalyticsIdContext } from "../src/react/analytics-context";
 import { LeadCapture, type LeadCaptureProps } from "../src/react/index";
 import { SUBMIT_TIMEOUT_MS } from "../src/react/use-lead-submit";
 import { serviceAreaPlace } from "../src/testing/index";
+import { MODEL } from "./support/fixtures";
 
 // A retry after a hung server must carry the id of the post it repeats: that
 // post may have been stored, and only the id lets the server answer the
 // retry with its row instead of storing a second lead.
 
-const MODEL = parsePricingModel(JSON.parse(readFileSync(join(import.meta.dirname, "fixtures/pricing/valid/cleaning.json"), "utf8")));
 const WEEKDAYS: readonly OpeningHours[] = [{ days: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"], opens: "08:00", closes: "19:00" }];
 // Paris is UTC+2 in October 2026.
 const MONDAY_10H = new Date("2026-10-05T08:00:00Z").getTime();

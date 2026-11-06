@@ -2,12 +2,14 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createLocaleRegistry } from "@evinvest/i18n";
 import {
+  checkPricingModel,
   defineSite,
   SERVICE_AREA_GATE,
   STOREFRONT_GATE,
   type LegacyRedirect,
   type PageSuffix,
   type Place,
+  type PricingModel,
   type Site,
 } from "../../src/index";
 
@@ -70,3 +72,10 @@ export function fixtureSite(name: string): Site<Locale> {
 
 /** Through JSON, as a crawler reads it: `undefined` keys vanish, order is the builders'. */
 export const viaJson = (value: unknown): unknown => JSON.parse(JSON.stringify(value));
+
+/** A brand's price list to test the site's flows with: a cleaning model, an estimate and a fixed need. */
+export const MODEL: PricingModel = (() => {
+  const { problems, model } = checkPricingModel(JSON.parse(readFileSync(join(import.meta.dirname, "../fixtures/model.json"), "utf8")));
+  if (!model) throw new Error(`fixtures/model.json: ${JSON.stringify(problems)}`);
+  return model;
+})();

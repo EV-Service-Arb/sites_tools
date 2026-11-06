@@ -1,21 +1,19 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import type { AnalyticsSink } from "@evinvest/analytics";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { hydrateRoot } from "react-dom/client";
 import { renderToString } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ESTIMATE_UNKNOWN, flowTextOf, LEAD_CAPTURE_TEXT, leadErrorOf, parsePricingModel, priceOf, type OpeningHours, type Place } from "../src/index";
+import { ESTIMATE_UNKNOWN, flowTextOf, LEAD_CAPTURE_TEXT, leadErrorOf, priceOf, type OpeningHours, type Place } from "../src/index";
 import { AnalyticsSinkContext } from "../src/react/analytics-context";
 import { LeadCapture, type LeadCaptureProps } from "../src/react/index";
 import { PriceCompact } from "../src/react/LeadCapturePrice";
 import { serviceAreaPlace } from "../src/testing/index";
+import { MODEL } from "./support/fixtures";
 
 // `layout="steps"` and the compact form's pieces: one question per screen,
 // the phone last, what the page knows never asked twice.
 
-const MODEL = parsePricingModel(JSON.parse(readFileSync(join(import.meta.dirname, "fixtures/pricing/valid/cleaning.json"), "utf8")));
 const WEEKDAYS: readonly OpeningHours[] = [{ days: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"], opens: "08:00", closes: "19:00" }];
 const MONDAY_10H = new Date("2026-10-05T08:00:00Z").getTime();
 const MOBILE = "+33 6 12 34 56 78";

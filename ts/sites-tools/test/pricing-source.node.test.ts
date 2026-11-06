@@ -1,12 +1,8 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { defineSite, parsePricingModel, type PricingModel } from "../src/index";
+import { defineSite, type PricingModel } from "../src/index";
 import { createPricingSource } from "../src/server/index";
-import { fixtureSite } from "./support/fixtures";
+import { fixtureSite, MODEL as BAKED } from "./support/fixtures";
 
-const model = (file: string): unknown => JSON.parse(readFileSync(join(import.meta.dirname, "fixtures/pricing", file), "utf8"));
-const BAKED = parsePricingModel(model("valid/cleaning.json"));
 const LIVE: PricingModel = { ...BAKED, validFrom: "2026-11-01", minimumCents: 5900 };
 
 const plain = fixtureSite("cleaning");
@@ -46,7 +42,7 @@ describe("the live price list", () => {
     ["not JSON", async () => new Response("<html>", { status: 200 })],
     ["a model that does not validate", async () => Response.json({ ...LIVE, roundToCents: 0 })],
     ["half a model", async () => Response.json({ ...LIVE, needs: undefined })],
-    ["a model missing a locale's labels", async () => Response.json(model("valid/at-the-cap.json"))],
+    ["a model missing a locale's labels", async () => Response.json({ ...LIVE, inputs: LIVE.inputs.map(i => ({ ...i, labels: { en: "x" } })) })],
     ["a list", async () => Response.json([])],
   ])("is the baked model, whole, when the source is %s", async (_, answer) => {
     vi.stubGlobal("fetch", vi.fn(answer));
@@ -70,8 +66,9 @@ describe("the live price list", () => {
 
 describe("defineSite", () => {
   it("refuses a baked model that would not validate, or lacks a locale's labels", () => {
-    expect(() => defineSite({ ...plain, pricing: { ...BAKED, roundToCents: 0 } })).toThrow(/pricing: model.roundToCents/);
-    expect(() => defineSite({ ...plain, pricing: parsePricingModel(model("valid/at-the-cap.json")) })).toThrow(/no "fr" label/);
+    expect(() => defineSite({ ...plain, pricing: { ...BAKED, roundToCents: 0 } })).toThrow(/pricing: roundToCents int/);
+    const english = { ...BAKED, inputs: BAKED.inputs.map(i => ({ ...i, labels: { en: "x" } })) };
+    expect(() => defineSite({ ...plain, pricing: english })).toThrow(/pricing: inputs\[0\]\.labels\.fr labelMissing/);
   });
 
   it("refuses a flow for a need the form does not offer", () => {

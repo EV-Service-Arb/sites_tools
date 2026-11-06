@@ -2,11 +2,11 @@
 
 import { useCallback, useMemo } from "react";
 import { EVENTS } from "../core/analytics";
-import type { BookingRequestedProperties } from "../core/booking/model";
+import type { BookingRequested } from "@evinvest/sites-contract";
 import { useAnalyticsSink } from "./analytics-context";
 
 /** A request as the page posts it; a provider outside the closed set is the server's to refuse. */
-export type PostedBooking = Omit<BookingRequestedProperties, "provider"> & { provider: string };
+export type PostedBooking = Omit<BookingRequested, "provider"> & { provider: string };
 
 /** Where `LeadCapture` posts a booking request: `bookingRoute`, beside the quote route. */
 export const BOOKING_ACTION = "/quote/booking";

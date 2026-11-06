@@ -8,15 +8,11 @@ import {
   checkWebhookUrl,
   leadWebhook,
   openWebhookOutbox,
-  panelChannel,
-  panelLocaleOf,
-  panelLocaleProperties,
   WEBHOOK_HORIZON_MS,
   WEBHOOK_MAX_DELAY_MS,
   parseServerEnv,
   signatureHeaders,
   signWebhook,
-  type LeadWebhookContext,
   type WebhookOutbox,
   type WebhookTarget,
 } from "../src/server/index";
@@ -327,127 +323,61 @@ describe("sites-tools-outbox", () => {
   });
 });
 
-describe("the panel's channel", () => {
-  // The panel's closed set (form | phone_inbound | callback) refuses a
-  // lead.created outside it, which would park the lead in the outbox.
-  it("is the lead's own channel: form for a form, callback for a callback", () => {
-    expect(panelChannel("form")).toBe("form");
-    expect(panelChannel("callback")).toBe("callback");
-  });
-});
-
 describe("the lead webhook", () => {
   const site = { brand: { id: "aquafix" } };
-  const on = { leadsDb: { kind: "sqlite" as const, path: ":memory:" }, leadWebhook: { url: TARGET.url, keyId: "k", secret: "s" } };
+  const on = { leadsDb: { kind: "sqlite" as const, path: ":memory:" }, leadWebhook: { url: TARGET.url, keyId: "aquafix-site", secret: "s" } };
+  const needLabel = (subject: string) => (subject === "hot_water" ? "Chauffe-eau" : subject);
 
-  it("is off without a URL or without the brand's body builder", () => {
-    expect(leadWebhook(site, { ...on, leadWebhook: null }, { signing: SIGNING, buildBody: () => ({}) })).toBeNull();
-    expect(leadWebhook(site, on, { signing: SIGNING })).toBeNull();
+  it("is off without a URL", () => {
+    expect(leadWebhook(site, { ...on, leadWebhook: null }, { needLabel })).toBeNull();
   });
 
-  it("serialises what the brand builds, once, with a stable idempotency key", async () => {
+  it("sends lead.created as the kit builds it, the same body on every attempt", async () => {
     const clock = { t: 1_790_762_400_000 };
     const { fetch, seen } = receiver(new Response(null, { status: 503 }), new Response(null, { status: 200 }));
-    const build = vi.fn((l: Lead, ctx: { leadId: number; idempotencyKey: string; brandId: string; at: Date; locale: string; formId: string }) => ({
-      id: ctx.idempotencyKey,
-      lead: ctx.leadId,
-      brand: ctx.brandId,
-      at: ctx.at.toISOString(),
-      locale: ctx.locale,
-      phone: l.mobile,
-    }));
-    const hook = leadWebhook(site, on, { signing: SIGNING, buildBody: build, fetch, now: () => clock.t, random: () => 0, log: quiet() });
+    const hook = leadWebhook(site, on, { needLabel, fetch, now: () => clock.t, random: () => 0, log: quiet() });
     if (!hook) throw new Error("expected the webhook on");
     opened.push(hook.outbox);
-    hook.enqueue(lead, 7, { locale: "fr", formId: "quote" });
+    hook.enqueue(lead, 7, { leadRef: "lead-7-0a1b2c3d" });
     await hook.tick();
     clock.t += 3600_000;
     await hook.tick();
-    expect(build).toHaveBeenCalledTimes(1);
     expect(seen).toHaveLength(2);
     expect(seen[0]?.body).toBe(seen[1]?.body);
-    expect(JSON.parse(seen[0]?.body ?? "")).toMatchObject({ lead: 7, brand: "aquafix", at: "2026-09-30T10:00:00.000Z", locale: "fr", phone: PII.mobile });
+    const { events } = JSON.parse(seen[0]?.body ?? "") as { events: Record<string, unknown>[] };
+    expect(events).toEqual([
+      {
+        id: expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-7/),
+        schema: "sa.funnel.v1",
+        type: "lead.created",
+        typeVersion: 1,
+        occurredAt: "2026-09-30T10:00:00.000Z",
+        source: { kind: "site", id: "aquafix-site" },
+        subject: { brandId: "aquafix", leadId: "lead-7-0a1b2c3d", locationId: "royat" },
+        properties: { channel: "form" },
+        pii: { note: "le chauffe-eau fuit", phone: PII.mobile, need: "Chauffe-eau", locality: PII.locality },
+      },
+    ]);
     expect(hook.outbox.rows()).toMatchObject([{ ref: "lead:7", state: "delivered", attempts: 2 }]);
   });
-});
 
-describe("the panel's locale", () => {
-  it("is fr or en by the language part of the site locale, and nothing for any other", () => {
-    expect(panelLocaleOf("fr")).toBe("fr");
-    expect(panelLocaleOf("en-GB")).toBe("en");
-    expect(panelLocaleOf("FR_ca")).toBe("fr");
-    expect(panelLocaleOf("ru")).toBeUndefined();
-    expect(panelLocaleOf("")).toBeUndefined();
-    expect(panelLocaleOf("fra")).toBeUndefined();
-  });
-
-  it("writes the property only for a locale the panel takes", () => {
-    expect(panelLocaleProperties("fr")).toEqual({ locale: "fr" });
-    expect(panelLocaleProperties(undefined)).toEqual({});
-  });
-
-  describe("through the lead webhook", () => {
-    const site = { brand: { id: "aquafix" } };
-    const on = { leadsDb: { kind: "sqlite" as const, path: ":memory:" }, leadWebhook: { url: TARGET.url, keyId: "k", secret: "s" } };
-
-    /** The contexts the brand's builder saw, and the bodies it made from them the way a brand writes it, as the receiver got them. */
-    function hook(panelLocale?: boolean) {
-      const contexts: LeadWebhookContext[] = [];
-      const { fetch, seen } = receiver(new Response(null, { status: 204 }));
-      const h = leadWebhook(site, on, {
-        signing: SIGNING,
-        buildBody: (l: Lead, ctx: LeadWebhookContext) => {
-          contexts.push(ctx);
-          return { id: ctx.idempotencyKey, phone: l.mobile, properties: { ...panelLocaleProperties(ctx.panelLocale), subject: l.subject } };
-        },
-        fetch,
-        log: quiet(),
-        ...(panelLocale === undefined ? {} : { panelLocale }),
-      });
-      if (!h) throw new Error("expected the webhook on");
-      opened.push(h.outbox);
-      const sentProperties = async (): Promise<Record<string, unknown>> => {
-        await h.tick();
-        return (JSON.parse(seen[0]?.body ?? "null") as { properties: Record<string, unknown> }).properties;
-      };
-      return { h, contexts, sentProperties };
-    }
-
-    it("is off by default: the context carries no panelLocale and the body is as it was", async () => {
-      const { h, contexts, sentProperties } = hook();
-      expect(h.panelLocale).toBe(false);
-      h.enqueue(lead, 1, { locale: "fr", formId: "quote" });
-      expect("panelLocale" in (contexts[0] ?? {})).toBe(false);
-      expect(contexts[0]?.locale).toBe("fr");
-      expect(await sentProperties()).toEqual({ subject: "hot_water" });
-    });
-
-    it("is off when asked off, whatever the locale", async () => {
-      const { h, contexts, sentProperties } = hook(false);
-      expect(h.panelLocale).toBe(false);
-      h.enqueue(lead, 1, { locale: "en-GB", formId: "quote" });
-      expect("panelLocale" in (contexts[0] ?? {})).toBe(false);
-      expect(await sentProperties()).toEqual({ subject: "hot_water" });
-    });
-
-    it("hands fr and en to the builder under panelLocale, and the body carries them", async () => {
-      const { h, contexts, sentProperties } = hook(true);
-      expect(h.panelLocale).toBe(true);
-      h.enqueue(lead, 1, { locale: "fr", formId: "quote" });
-      expect(contexts[0]?.panelLocale).toBe("fr");
-      expect(await sentProperties()).toEqual({ locale: "fr", subject: "hot_water" });
-      const second = hook(true);
-      second.h.enqueue(lead, 2, { locale: "en-GB", formId: "quote" });
-      expect(second.contexts[0]?.panelLocale).toBe("en");
-      expect(await second.sentProperties()).toEqual({ locale: "en", subject: "hot_water" });
-    });
-
-    it("leaves a locale the panel does not take out of the context and the body", async () => {
-      const { h, contexts, sentProperties } = hook(true);
-      h.enqueue(lead, 1, { locale: "ru", formId: "quote" });
-      expect("panelLocale" in (contexts[0] ?? {})).toBe(false);
-      expect(contexts[0]?.locale).toBe("ru");
-      expect(await sentProperties()).toEqual({ subject: "hot_water" });
+  it("says how the need was sold, and the reference a chat carries", async () => {
+    const { fetch, seen } = receiver(new Response(null, { status: 200 }));
+    const hook = leadWebhook(site, on, { needLabel, fetch, log: quiet() });
+    if (!hook) throw new Error("expected the webhook on");
+    opened.push(hook.outbox);
+    const priced: Lead = { ...lead, channel: "whatsapp", messageRef: "AQ-7K3F", flow: "estimate", price: { cents: 8400, validFrom: "2026-10-01", inputs: { zone: "centre" } }, spamVerdict: "too-fast" };
+    hook.enqueue(priced, 8, { leadRef: "lead-8-0a1b2c3d", analyticsId: "ph.1" });
+    await hook.tick();
+    expect((JSON.parse(seen[0]?.body ?? "") as { events: { properties: unknown }[] }).events[0]?.properties).toEqual({
+      channel: "whatsapp",
+      message_ref: "AQ-7K3F",
+      flow: "estimate",
+      quoted_cents: 8400,
+      pricing_valid_from: "2026-10-01",
+      estimate_inputs: { zone: "centre" },
+      suspect: "too_fast",
+      analytics_id: "ph.1",
     });
   });
 });
@@ -465,34 +395,38 @@ describe("the quote route with a webhook", () => {
     let n = 0;
     return { insert: async () => ++n, count: async () => n, schemaVersion: async () => 4, health: async () => undefined, close: async () => undefined };
   };
+  type Sent = { subject: { leadId: string; locationId?: string }; properties: { suspect?: string; analytics_id?: string } };
+  const sent = (seen: { body: string }[]): Sent[] => seen.flatMap(s => (JSON.parse(s.body) as { events: Sent[] }).events);
 
-  it("queues the lead before the 303 and sends it after; a honeypot lead is neither", async () => {
+  function wired(options: { production?: boolean; limit?: number; defer?: "now" | "later" } = {}) {
     const { fetch, seen } = receiver(new Response(null, { status: 200 }));
     const deferred: (() => Promise<void> | void)[] = [];
-    const hook = leadWebhook(site, { leadsDb: { kind: "sqlite", path: ":memory:" }, leadWebhook: { url: TARGET.url, keyId: "k", secret: "s" } }, {
-      signing: SIGNING,
-      buildBody: (l, ctx) => ({ lead: ctx.leadId, place: l.placeSlug }),
-      fetch,
-      log: quiet(),
-    });
+    const hook = leadWebhook(site, { leadsDb: { kind: "sqlite", path: ":memory:" }, leadWebhook: { url: TARGET.url, keyId: "k", secret: "s" } }, { needLabel: s => s, fetch, log: quiet() });
     if (!hook) throw new Error("expected the webhook on");
     opened.push(hook.outbox);
+    const notify = vi.fn(async (_lead: Lead, _id: number) => undefined);
+    const log = { warn: vi.fn(), error: vi.fn() };
     const route = quoteRoute(site, {
-      env: () => ({ leadsDb: { kind: "sqlite", path: ":memory:" }, posthogKey: null, posthogHost: "https://eu.i.posthog.com", trustedProxy: null }),
-      notifier: () => ({ notify: async () => undefined }),
+      env: () => ({ leadsDb: { kind: "sqlite", path: ":memory:" }, posthogKey: null, posthogHost: "https://eu.i.posthog.com", trustedProxy: null, production: options.production ?? true }),
+      notifier: () => ({ notify }),
       webhook: () => hook,
       unavailable: () => ({ title: "", heading: "", body: "", callLabel: "" }),
       store,
-      defer: task => void deferred.push(task),
+      limiter: new RateLimiter(options.limit ?? 100, 60_000),
+      defer: task => (options.defer === "later" ? void deferred.push(task) : void task()),
       now: () => NOW,
-      log: { warn: vi.fn(), error: vi.fn() },
+      log,
     });
+    return { hook, route, seen, deferred, notify, log };
+  }
 
+  it("queues the lead before the 303 and sends it after; a honeypot lead is neither", async () => {
+    const { hook, route, seen, deferred } = wired({ defer: "later" });
     const res = await route(post());
     expect(res.status).toBe(303);
     expect(hook.outbox.rows()).toMatchObject([{ ref: "lead:1", state: "pending" }]);
     for (const task of deferred.splice(0)) await task();
-    expect(seen.map(s => JSON.parse(s.body))).toEqual([{ lead: 1, place: "royat" }]);
+    expect(sent(seen).map(e => e.subject.locationId)).toEqual(["royat"]);
     expect(hook.outbox.rows()[0]?.state).toBe("delivered");
 
     expect((await route(post({ website: "http://spam" }))).status).toBe(303);
@@ -500,64 +434,18 @@ describe("the quote route with a webhook", () => {
     hook.stop();
   });
 
-  it("hands the page's analytics id to the body builder, and drops one that is not the panel's shape", async () => {
-    const seenIds: (string | null)[] = [];
-    const hook = leadWebhook(site, { leadsDb: { kind: "sqlite", path: ":memory:" }, leadWebhook: { url: TARGET.url, keyId: "k", secret: "s" } }, {
-      signing: SIGNING,
-      buildBody: (_l, ctx) => (seenIds.push(ctx.analyticsId ?? null), {}),
-      fetch: receiver(new Response(null, { status: 200 })).fetch,
-      log: quiet(),
-    });
-    if (!hook) throw new Error("expected the webhook on");
-    opened.push(hook.outbox);
-    const route = quoteRoute(site, {
-      env: () => ({ leadsDb: { kind: "sqlite", path: ":memory:" }, posthogKey: null, posthogHost: "https://eu.i.posthog.com", trustedProxy: null }),
-      notifier: () => ({ notify: async () => undefined }),
-      webhook: () => hook,
-      unavailable: () => ({ title: "", heading: "", body: "", callLabel: "" }),
-      store,
-      limiter: new RateLimiter(100, 60_000),
-      defer: () => undefined,
-      now: () => NOW,
-      log: { warn: vi.fn(), error: vi.fn() },
-    });
+  it("carries the page's analytics id, and drops one that is not the panel's shape", async () => {
+    const { hook, route, seen } = wired();
     const id = "0192f0a4-7b3c-4d2e-9f10-123456789abc";
-    for (const fields of [{ analytics_id: id }, {}, { analytics_id: "has space" }, { analytics_id: "x".repeat(129) }, { analytics_id: "" }]) {
-      expect((await route(post({ ...fields, zip: String(63130 + seenIds.length) }))).status).toBe(303);
-    }
-    expect(seenIds).toEqual([id, null, null, null, null]);
+    const fields = [{ analytics_id: id }, {}, { analytics_id: "has space" }, { analytics_id: "x".repeat(129) }, { analytics_id: "" }];
+    for (const [i, f] of fields.entries()) expect((await route(post({ ...f, zip: String(63130 + i) }))).status).toBe(303);
+    await vi.waitFor(() => expect(sent(seen)).toHaveLength(fields.length));
+    expect(sent(seen).map(e => e.properties.analytics_id ?? null)).toEqual([id, null, null, null, null]);
     hook.stop();
   });
 
   // LEAD-FORMS-REVIEW-2026-10-03 #9: a rate-limited lead was thanked and never seen.
   describe("and the panel's suspect marker", () => {
-    function wired(panelSuspect: boolean | undefined, production = true) {
-      const bodies: unknown[] = [];
-      const hook = leadWebhook(site, { leadsDb: { kind: "sqlite", path: ":memory:" }, leadWebhook: { url: TARGET.url, keyId: "k", secret: "s" } }, {
-        signing: SIGNING,
-        buildBody: (l, ctx) => (bodies.push({ lead: ctx.leadId, suspect: ctx.suspect ?? null }), {}),
-        fetch: receiver(new Response(null, { status: 200 })).fetch,
-        log: quiet(),
-        ...(panelSuspect === undefined ? {} : { panelSuspect }),
-      });
-      if (!hook) throw new Error("expected the webhook on");
-      opened.push(hook.outbox);
-      const notify = vi.fn(async (_lead: Lead, _id: number) => undefined);
-      const log = { warn: vi.fn(), error: vi.fn() };
-      const route = quoteRoute(site, {
-        env: () => ({ leadsDb: { kind: "sqlite", path: ":memory:" }, posthogKey: null, posthogHost: "https://eu.i.posthog.com", trustedProxy: null, production }),
-        notifier: () => ({ notify }),
-        webhook: () => hook,
-        unavailable: () => ({ title: "", heading: "", body: "", callLabel: "" }),
-        store,
-        limiter: new RateLimiter(1, 60_000),
-        defer: task => void task(),
-        now: () => NOW,
-        log,
-      });
-      return { bodies, route, notify, log };
-    }
-
     it("names a rate-limited or too-fast lead, and never the honeypot", () => {
       expect(suspectOf({ spamVerdict: "rate-limited" })).toBe("rate_limited");
       expect(suspectOf({ spamVerdict: "too-fast" })).toBe("too_fast");
@@ -565,35 +453,26 @@ describe("the quote route with a webhook", () => {
       expect(suspectOf({ spamVerdict: null })).toBeUndefined();
     });
 
-    it("is off by default: the queue and the body are as before", async () => {
-      const { bodies, route } = wired(undefined);
+    it("sends the rate-limited lead marked, the too-fast one too, and never the honeypot nor a mail for them", async () => {
+      const { hook, route, seen, notify } = wired({ limit: 1 });
       await route(post({ t: String(NOW - 1_000) }));
       await route(post());
       await route(post({ hp_ref: "http://spam" }));
-      // The too-fast lead goes on unmarked; the rate-limited one and the honeypot do not go.
-      expect(bodies).toEqual([{ lead: 1, suspect: null }]);
-    });
-
-    it("on, sends the rate-limited lead marked, the too-fast one too, and never the honeypot nor a mail for them", async () => {
-      const { bodies, route, notify } = wired(true);
-      await route(post({ t: String(NOW - 1_000) }));
-      await route(post());
-      await route(post({ hp_ref: "http://spam" }));
-      expect(bodies).toEqual([
-        { lead: 1, suspect: "too_fast" },
-        { lead: 2, suspect: "rate_limited" },
-      ]);
+      await vi.waitFor(() => expect(sent(seen)).toHaveLength(2));
+      expect(sent(seen).map(e => e.properties.suspect)).toEqual(["too_fast", "rate_limited"]);
       // Mail as before: the too-fast lead only.
       expect(notify.mock.calls.map(c => c[1])).toEqual([1]);
+      hook.stop();
     });
 
-    it("on, does not tell a developer the queued rate-limited lead went nowhere", async () => {
-      const { route, log } = wired(true, false);
+    it("does not tell a developer the queued rate-limited lead went nowhere", async () => {
+      const { hook, route, log } = wired({ production: false, limit: 1 });
       await route(post());
       await route(post());
       const said = JSON.stringify(log.warn.mock.calls);
       expect(said).toContain("rate-limited");
       expect(said).not.toContain("no webhook");
+      hook.stop();
     });
   });
 });

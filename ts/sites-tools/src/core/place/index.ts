@@ -21,7 +21,7 @@ export {
 } from "./publication";
 export { DEFAULT_TIME_ZONE, isOpenAt, nextOpening, type Opening } from "./hours";
 export { freshRating, parseInstant, RATING_MAX_AGE_DAYS } from "./rating";
-export { mergeLive, parsePlaceLive, type PlaceLive } from "./live";
+export { mergeLive } from "./live";
 export {
   createPlaceView,
   placeHref,

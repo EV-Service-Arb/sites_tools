@@ -7,7 +7,7 @@ import { fillText } from "../../core/lead-capture-format";
 import { telegramHref, type MessengerMode } from "../../core/messenger";
 import { messengerMessage } from "../../core/messenger-message";
 import { messengerTextOf, type LeadCaptureMessengerText } from "../../core/messenger-text";
-import { phoneProblem } from "../../core/phone";
+import { phoneProblem } from "@evinvest/sites-contract";
 import { partWithLeading } from "../parts";
 import { useAnalyticsId } from "../analytics-context";
 import { postInBackground } from "../use-lead-submit";

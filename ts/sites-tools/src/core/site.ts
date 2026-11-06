@@ -1,12 +1,9 @@
 import type { LocaleRegistry } from "@evinvest/i18n";
-import type { BookingRules } from "./booking/model";
-import { bookingConfigProblems, calComHostsProblems } from "./booking/validate";
+import { checkBookingConfig, checkPricingModel, type PricingModel } from "@evinvest/sites-contract";
 import type { LeadSchema } from "./lead";
 import { TELEGRAM_BOT, type MessengerFacts } from "./messenger";
 import type { PublicationPolicy } from "./place/publication";
 import type { Place } from "./place/types";
-import type { PricingModel } from "./pricing/model";
-import { pricingProblemsFor } from "./pricing/validate";
 
 /**
  * The composition root of a landing site: every brand fact the machinery reads
@@ -72,13 +69,6 @@ export interface SiteConfig<L extends string, P extends string> {
    * down, or serves nothing valid. Absent → every need is a `quote` then.
    */
   pricing?: PricingModel;
-  /**
-   * The booking rules a place's `booking` is held to, baked or live:
-   * `calComHosts` are the Cal.com hosts a `cal_com` page may be on — the
-   * hosted cloud by default (`DEFAULT_CAL_COM_HOSTS`); a brand on its own
-   * Cal.com lists both, `["cal.com", "cal.brand.fr"]`.
-   */
-  booking?: BookingRules;
   legacyRedirects?: readonly LegacyRedirect<L>[];
   /**
    * Paths the brand serves as files besides the routes every landing has
@@ -121,19 +111,14 @@ export function defineSite<const L extends string, const P extends string>(confi
   }
   if (config.pricing) {
     // Baked into the build: a model the live source would refuse must not ship.
-    const problems = pricingProblemsFor(config.pricing, config.i18n.locales);
-    if (problems.length > 0) throw new Error(`defineSite: pricing: ${problems.join("; ")}`);
-  }
-  const calComHosts = config.booking?.calComHosts;
-  if (calComHosts) {
-    const problems = calComHostsProblems(calComHosts);
-    if (problems.length > 0) throw new Error(`defineSite: booking.${problems.join("; ")}`);
+    const { problems } = checkPricingModel(config.pricing, config.i18n.locales);
+    if (problems.length > 0) throw new Error(`defineSite: pricing: ${problems.map(p => `${p.path} ${p.code}`).join("; ")}`);
   }
   for (const place of config.places) {
     // Baked into the build: a booking the live source would refuse must not ship.
     if (place.booking === undefined) continue;
-    const problems = bookingConfigProblems(place.booking, config.booking ?? {});
-    if (problems.length > 0) throw new Error(`defineSite: place "${place.slug}": ${problems.join("; ")}`);
+    const { problems } = checkBookingConfig(place.booking);
+    if (problems.length > 0) throw new Error(`defineSite: place "${place.slug}": booking ${problems.map(p => `${p.path} ${p.code}`).join("; ")}`);
   }
   for (const need of Object.keys(config.lead.flows ?? {})) {
     if (!config.lead.subjects.includes(need)) throw new Error(`defineSite: lead.flows names "${need}", which is not one of lead.subjects`);

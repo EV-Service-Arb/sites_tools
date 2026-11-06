@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useRef, type RefObject } from "react";
 import { EVENTS, experimentProps, type LeadField, type LeadStep } from "../core/analytics";
+import { centsBucket } from "../core/pricing/bucket";
 import type { ChannelsAvailable } from "../core/messenger";
-import { centsBucket } from "../core/pricing/price";
 import { useAnalyticsSink } from "./analytics-context";
 
 /** The attribute a lead form's control names its role in, for `lead_form_field_error`. */

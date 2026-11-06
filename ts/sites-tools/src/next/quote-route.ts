@@ -3,7 +3,8 @@ import { CONFIRM_PATH, confirmQuery } from "./confirm-route";
 import { createAcceptLead, PRICE_CHANGED, submitTagsOf } from "../core/accept";
 import { analyticsSink, EVENTS } from "../core/analytics";
 import { RateLimiter } from "../core/antispam";
-import { CARD_FIELD, CARD_ID, channelOf, LEAD_CARD_PARAM, LEAD_ERROR_PARAM, type LeadChannel, type LeadStore } from "../core/lead";
+import { CARD_FIELD, CARD_ID, channelOf, LEAD_CARD_PARAM, LEAD_ERROR_PARAM, type LeadStore } from "../core/lead";
+import type { SiteChannel } from "@evinvest/sites-contract";
 import type { Place } from "../core/place/types";
 import { createPlaceView } from "../core/place/view";
 import { createRouting } from "../core/routing";
@@ -156,10 +157,11 @@ export function quoteRoute<L extends string, P extends string>(
   };
   // Read before the lead is stored, so a webhook that cannot be built must
   // not throw here: it would cost the lead. `enqueue` says why, after the insert.
-  const suspectQueued = (): boolean => {
+  const webhookOn = (): boolean => {
     try {
-      return leadWebhook()?.panelSuspect ?? false;
+      return leadWebhook() !== null;
     } catch {
+      // `enqueue` says why, once the lead is stored.
       return false;
     }
   };
@@ -183,7 +185,7 @@ export function quoteRoute<L extends string, P extends string>(
    * slugs only: a phone or a name in a URL ends up in logs and analytics. The
    * card is the one the form posted, if its id is a slug.
    */
-  function refused(form: FormData, field: string, channel: LeadChannel): string {
+  function refused(form: FormData, field: string, channel: SiteChannel): string {
     const query = new URLSearchParams({ [LEAD_ERROR_PARAM]: field });
     const subject = form.get(site.lead.wire.subject);
     if (channel === "form" && typeof subject === "string" && site.lead.subjects.includes(subject as P)) query.set("need", subject);
@@ -227,7 +229,6 @@ export function quoteRoute<L extends string, P extends string>(
     const outcome = await accept(form, clientKey(request.headers, env.trustedProxy ?? DEV_TRUST), {
       insert: lead => leadStore().insert(lead),
       findSubmission: async submissionId => (await leadStore().findSubmission?.(submissionId)) ?? null,
-      sendSuspect: suspectQueued(),
       ...(deps.pricing ? { pricing: () => deps.pricing?.model() ?? Promise.resolve(null) } : {}),
       defer,
       notify: (lead, id) => {
@@ -256,7 +257,7 @@ export function quoteRoute<L extends string, P extends string>(
       now: deps.now?.() ?? Date.now(),
       log,
     });
-    const held = outcome.kind === "stored" && !outcome.duplicate && (outcome.lead.spamVerdict === "honeypot" || (outcome.lead.spamVerdict === "rate-limited" && !suspectQueued()));
+    const held = outcome.kind === "stored" && !outcome.duplicate && (outcome.lead.spamVerdict === "honeypot" || (outcome.lead.spamVerdict === "rate-limited" && !webhookOn()));
     if (held && outcome.kind === "stored" && env.production === false) {
       // A local stack posts every test lead from one address: say it, loudly.
       log.warn(

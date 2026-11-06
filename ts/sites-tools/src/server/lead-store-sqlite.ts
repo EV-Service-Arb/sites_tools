@@ -2,8 +2,9 @@ import "server-only";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
-import { channelOf, LEAD_CHANNELS, LEAD_SCHEMA_VERSION, type Lead, type LeadPrice, type LeadStore, type SpamVerdict } from "../core/lead";
-import { LEAD_FLOWS, type LeadFlow } from "../core/pricing/flow";
+import { SITE_CHANNELS } from "@evinvest/sites-contract";
+import { channelOf, LEAD_SCHEMA_VERSION, type Lead, type LeadPrice, type LeadStore, type SpamVerdict } from "../core/lead";
+import { LEAD_FLOWS, type LeadFlow } from "@evinvest/sites-contract";
 
 /**
  * The SQLite adapter of the `LeadStore` port: one file on the pod's volume.
@@ -135,7 +136,7 @@ function leadOf(row: unknown): Lead {
     extras: strings(str(row, "extras")),
     placeSlug: str(row, "location_id"),
     spamVerdict: verdict !== null && VERDICTS.includes(verdict) ? (verdict as SpamVerdict) : null,
-    channel: LEAD_CHANNELS.find(c => c === str(row, "channel")) ?? "form",
+    channel: SITE_CHANNELS.find(c => c === str(row, "channel")) ?? "form",
     ...(consentAt !== null ? { consent: { at: consentAt, text: str(row, "consent_text") ?? "" } } : {}),
     ...(submissionId !== null ? { submissionId } : {}),
     ...(flow !== undefined ? { flow } : {}),

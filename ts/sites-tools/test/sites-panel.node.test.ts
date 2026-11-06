@@ -5,14 +5,13 @@ import { join } from "node:path";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { siteReportRoute } from "../src/next/index";
 import { createExperimentsSource, createPlaceSource, createPricingSource, parseServerEnv } from "../src/server/index";
-import { fixtureSite } from "./support/fixtures";
+import { fixtureSite, MODEL } from "./support/fixtures";
 
 // sites_panel as a landing reaches it: a real HTTP server under `/api/internal`,
 // whose answers each test sets per path.
 const site = fixtureSite("aquafix");
 const BRAND = "/api/internal/brands/aquafix";
 const VERSION = (JSON.parse(readFileSync(join(import.meta.dirname, "../package.json"), "utf8")) as { version: string }).version;
-const MODEL: unknown = JSON.parse(readFileSync(join(import.meta.dirname, "fixtures/pricing/valid/cleaning.json"), "utf8"));
 const quiet = { log: { error: () => undefined } };
 
 type Answer = { status: number; json?: unknown; text?: string };
@@ -85,7 +84,7 @@ describe("/.well-known/sa-site", () => {
     connect();
     const [live, withdrawn, gone, empty, failing] = slugs;
     answers = {
-      [`${BRAND}/locations/${live}`]: { status: 200, json: { phone: "+33 4 11 11 11 11" } },
+      [`${BRAND}/locations/${live}`]: { status: 200, json: { phone: "+33411111111" } },
       [`${BRAND}/locations/${withdrawn}`]: { status: 404, json: { error: "withdrawn" } },
       [`${BRAND}/locations/${gone}`]: { status: 410 },
       [`${BRAND}/locations/${empty}`]: { status: 200, json: {} },

@@ -2,7 +2,8 @@
 
 import { useRef, useState, type FormEvent, type FormEventHandler } from "react";
 import { ANALYTICS_ID_FIELD } from "../core/accept";
-import { CHANNEL_FIELD, SUBMISSION_FIELD, type LeadChannel } from "../core/lead";
+import type { SiteChannel } from "@evinvest/sites-contract";
+import { CHANNEL_FIELD, SUBMISSION_FIELD } from "../core/lead";
 import { THANKS } from "../core/routing";
 import { useAnalyticsId } from "./analytics-context";
 
@@ -10,7 +11,7 @@ import { useAnalyticsId } from "./analytics-context";
  * Which of the card's forms a submit posts: a messenger lead is posted in the
  * background instead (`postInBackground`), and never answers in the card.
  */
-export type FormChannel = Extract<LeadChannel, "form" | "callback">;
+export type FormChannel = Extract<SiteChannel, "form" | "callback">;
 
 /** What the visitor just sent, for a brand's in-card success ("we call 06 … back"). */
 export interface LeadSent {

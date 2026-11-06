@@ -1,17 +1,15 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import type { AnalyticsSink } from "@evinvest/analytics";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { renderToString } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { LEAD_CAPTURE_TEXT, leadErrorOf, parsePricingModel, type LeadCaptureText, type OpeningHours, type Place } from "../src/index";
+import { LEAD_CAPTURE_TEXT, leadErrorOf, type LeadCaptureText, type OpeningHours, type Place } from "../src/index";
 import { AnalyticsSinkContext } from "../src/react/analytics-context";
 import { LeadCapture, type LeadCaptureProps } from "../src/react/index";
 import { navigation } from "../src/react/use-lead-submit";
 import { serviceAreaPlace } from "../src/testing/index";
+import { MODEL } from "./support/fixtures";
 
-const MODEL = parsePricingModel(JSON.parse(readFileSync(join(import.meta.dirname, "fixtures/pricing/valid/cleaning.json"), "utf8")));
 const WEEKDAYS: readonly OpeningHours[] = [{ days: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"], opens: "08:00", closes: "19:00" }];
 const MONDAY_10H = new Date("2026-10-05T08:00:00Z").getTime();
 const MOBILE = "+33 6 12 34 56 78";

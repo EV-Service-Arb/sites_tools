@@ -59,7 +59,9 @@ describe("the declared peers", () => {
     // The test runners the suites import are the brand's devDependencies, not
     // peers: a peer counts as a production dependency for `npm audit`.
     const runners = ["vitest", "@playwright/test"];
-    expect([...imported].filter(n => !runners.includes(n)).sort()).toEqual(Object.keys(manifest.peerDependencies).sort());
+    // A dependency ships inside the kit: the contract is the kit's, not a brand's to pick.
+    const bundled = Object.keys(manifest.dependencies);
+    expect([...imported].filter(n => !runners.includes(n) && !bundled.includes(n)).sort()).toEqual(Object.keys(manifest.peerDependencies).sort());
     for (const r of runners) expect(manifest.peerDependencies[r], r).toBeUndefined();
   });
 });

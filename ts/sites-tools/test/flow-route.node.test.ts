@@ -1,12 +1,9 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { defineSite, ESTIMATE_UNKNOWN, leadRef, parsePricingModel, type Lead, type PricingModel } from "../src/index";
+import { defineSite, ESTIMATE_UNKNOWN, leadRef, type Lead, type PricingModel } from "../src/index";
 import { confirmRoute, quoteRoute } from "../src/next/index";
-import { leadWebhook, openSqliteLeadStore, panelFlowOf, panelFlowProperties, type LeadWebhookContext, type PricingSource, type WebhookOutbox } from "../src/server/index";
-import { fixtureSite } from "./support/fixtures";
+import { leadWebhook, openSqliteLeadStore, type PricingSource, type WebhookOutbox } from "../src/server/index";
+import { fixtureSite, MODEL as BAKED } from "./support/fixtures";
 
-const BAKED = parsePricingModel(JSON.parse(readFileSync(join(import.meta.dirname, "fixtures/pricing/valid/cleaning.json"), "utf8")));
 const LIVE: PricingModel = { ...BAKED, validFrom: "2026-11-01", minimumCents: 9900 };
 
 const aquafix = fixtureSite("aquafix");
@@ -30,15 +27,15 @@ afterEach(() => {
   for (const o of opened.splice(0)) o.close();
 });
 
-function harness(over: { pricing?: PricingSource; panelFlow?: boolean } = {}) {
+type Sent = { subject: { leadId: string }; properties: Record<string, unknown> };
+
+function harness(over: { pricing?: PricingSource } = {}) {
   const store = openSqliteLeadStore(":memory:");
-  const bodies: LeadWebhookContext[] = [];
+  const posted: string[] = [];
   const hook = leadWebhook(site, { leadsDb: { kind: "sqlite", path: ":memory:" }, leadWebhook: { url: "http://panel.local/ingest", keyId: "k", secret: "s" } }, {
-    signing: { prefix: "p.", headers: { keyId: "x-k", timestamp: "x-t", signature: "x-s" } },
-    buildBody: (_lead, ctx) => (bodies.push(ctx), {}),
-    fetch: vi.fn(async () => new Response(null, { status: 200 })),
+    needLabel: subject => subject,
+    fetch: vi.fn(async (_url: string | URL | Request, init?: RequestInit) => (posted.push(String(init?.body)), new Response(null, { status: 200 }))),
     log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
-    ...(over.panelFlow === undefined ? {} : { panelFlow: over.panelFlow }),
   });
   if (!hook) throw new Error("expected the webhook on");
   opened.push(hook.outbox);
@@ -55,6 +52,11 @@ function harness(over: { pricing?: PricingSource; panelFlow?: boolean } = {}) {
     ...(over.pricing ? { pricing: over.pricing } : {}),
   });
   const stored = async (sid: string): Promise<Lead | undefined> => (await store.findSubmission(sid))?.lead;
+  /** The events the panel was sent, once the outbox has run. */
+  const bodies = async (): Promise<Sent[]> => {
+    await hook.tick();
+    return posted.flatMap(b => (JSON.parse(b) as { events: Sent[] }).events);
+  };
   return { route, store, bodies, log, stored };
 }
 
@@ -140,33 +142,24 @@ describe("the quote route, pricing a lead", () => {
 });
 
 describe("the lead webhook and the sale", () => {
-  it("is off by default: the context carries the reference, never the sale", async () => {
+  it("names the lead by the reference the page was answered with", async () => {
     const { route, bodies } = harness();
     await route(post({ ...ESTIMATE, submission_id: sid(11) }));
-    expect(bodies).toHaveLength(1);
-    expect(bodies[0]?.leadRef).toBe(leadRef(1, sid(11)));
-    expect(bodies[0]).not.toHaveProperty("flow");
+    expect((await bodies()).map(b => b.subject.leadId)).toEqual([leadRef(1, sid(11))]);
   });
 
-  it("on, tells the panel how the need was sold and at what price", async () => {
-    const { route, bodies } = harness({ panelFlow: true });
+  it("tells the panel how the need was sold and at what price, never a price with a quote", async () => {
+    const { route, bodies } = harness();
     await route(post({ ...ESTIMATE, submission_id: sid(12) }));
     await route(post({ job: "windows", submission_id: sid(13) }));
     await route(post({ job: "deep", submission_id: sid(14) }));
     await route(post({ channel: "callback", consent: "oui", submission_id: sid(15) }));
-    expect(bodies.map(b => panelFlowProperties(b.flow))).toEqual([
-      { flow: "estimate", quoted_cents: 8400, pricing_valid_from: "2026-10-01", estimate_inputs: { zone: "proche", bedrooms: "t3", surface: "s70", frequency: "biweekly" } },
-      { flow: "fixed", quoted_cents: 8900, pricing_valid_from: "2026-10-01" },
-      { flow: "quote" },
-      {},
+    expect((await bodies()).map(b => b.properties)).toEqual([
+      { channel: "form", flow: "estimate", quoted_cents: 8400, pricing_valid_from: "2026-10-01", estimate_inputs: { zone: "proche", bedrooms: "t3", surface: "s70", frequency: "biweekly" } },
+      { channel: "form", flow: "fixed", quoted_cents: 8900, pricing_valid_from: "2026-10-01" },
+      { channel: "form", flow: "quote" },
+      { channel: "callback" },
     ]);
-  });
-
-  it("never sends a price with a quote, nor answers without a price", () => {
-    expect(panelFlowOf({ flow: "quote", price: { cents: 1, validFrom: "2026-10-01" } })).toEqual({ flow: "quote" });
-    expect(panelFlowOf({ flow: "estimate" })).toEqual({ flow: "quote" });
-    expect(panelFlowOf({ flow: "estimate", price: { cents: 7000, validFrom: "2026-10-01", inputs: {} } })).toEqual({ flow: "estimate", quotedCents: 7000, pricingValidFrom: "2026-10-01" });
-    expect(panelFlowOf({})).toBeUndefined();
   });
 });
 
@@ -270,7 +263,7 @@ describe("the quote route, a retry racing the post it repeats", () => {
     const retry = await (await route(post({ ...ESTIMATE, submission_id: sid(50) }))).json();
     expect(retry).toEqual(first);
     expect(await store.count()).toBe(1);
-    expect(bodies).toHaveLength(1);
+    expect(await bodies()).toHaveLength(1);
   });
 
   it("answers the first post with the retry's row when the retry was stored first", async () => {
@@ -288,7 +281,7 @@ describe("the quote route, a retry racing the post it repeats", () => {
     // Both reached the insert: the unique index, not the lookup, kept the second row out.
     expect(insert).toHaveBeenCalledTimes(2);
     expect(await store.count()).toBe(1);
-    expect(bodies).toHaveLength(1);
+    expect(await bodies()).toHaveLength(1);
     expect(log.error).not.toHaveBeenCalled();
   });
 });

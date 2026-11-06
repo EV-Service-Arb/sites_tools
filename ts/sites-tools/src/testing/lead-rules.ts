@@ -1,5 +1,5 @@
 import { CHANNEL_FIELD, readCandidate, validateCandidate, type LeadSchema } from "../core/lead";
-import { phoneProblem } from "../core/phone";
+import { phoneProblem } from "@evinvest/sites-contract";
 
 /**
  * Numbers people type, and whether each is a way to reach them — the

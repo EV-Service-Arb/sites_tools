@@ -1,5 +1,6 @@
 import "server-only";
-import { mergeLive, parsePlaceLive } from "../core/place/live";
+import { checkPlaceLive, type PlaceProblem } from "@evinvest/sites-contract";
+import { mergeLive } from "../core/place/live";
 import type { Place } from "../core/place/types";
 import type { Site } from "../core/site";
 import { sitesPanelBrand } from "./env";
@@ -53,7 +54,8 @@ export const PLACE_REVALIDATE_SECONDS = 600;
 const TIMEOUT_MS = 3_000;
 
 type Fetched<L extends string> =
-  | { kind: "live"; place: Place<L>; empty: boolean }
+  /** `dropped`: the fields the panel's rules refuse, which the baked place keeps. */
+  | { kind: "live"; place: Place<L>; empty: boolean; dropped: PlaceProblem[] }
   | { kind: "withdrawn" }
   | Down;
 
@@ -78,7 +80,9 @@ export async function fetchPlace<L extends string, P extends string>(site: Site<
   if (!response.ok) return { kind: "down", detail: `answered ${response.status}` };
   try {
     const body: unknown = await response.json();
-    return { kind: "live", place: mergeLive(baked, parsePlaceLive(body, site.i18n.locales, site.booking ?? {})), empty: isEmptyObject(body) };
+    const { live, problems } = checkPlaceLive(body);
+    if (problems.some(p => p.path === "")) return { kind: "down", detail: "not an object" };
+    return { kind: "live", place: mergeLive(baked, live, site.i18n.locales), empty: isEmptyObject(body), dropped: problems };
   } catch (cause) {
     // A body that is not the source's shape is the source failing, not the place.
     return { kind: "down", detail: "not the source's shape", cause };
@@ -92,8 +96,11 @@ export function createPlaceSource<L extends string, P extends string>(site: Site
   let brand: string | null | undefined;
   const brandBase = () => (brand === undefined ? (brand = sitesPanelBrand(site, process.env)) : brand);
 
-  const fetchOne = (base: string, baked: Place<L>, locale: L) =>
-    fetchPlace(site, base, baked, locale, { cache: "force-cache", next: { revalidate }, signal: AbortSignal.timeout(timeoutMs) });
+  const fetchOne = async (base: string, baked: Place<L>, locale: L) => {
+    const fetched = await fetchPlace(site, base, baked, locale, { cache: "force-cache", next: { revalidate }, signal: AbortSignal.timeout(timeoutMs) });
+    if (fetched.kind === "live" && fetched.dropped.length > 0) log.error(`live place ${baked.slug}: kept baked for ${fetched.dropped.map(p => `${p.path} ${p.code}`).join(", ")}`);
+    return fetched;
+  };
 
   const baked = (slug: string) => site.places.find(p => p.slug === slug);
 

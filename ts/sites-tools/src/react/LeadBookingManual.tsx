@@ -2,7 +2,7 @@
 
 import { Button, cn } from "@evinvest/uikit";
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
-import { PREFERRED_PARTS, type PreferredPart } from "../core/booking/model";
+import { DAY_PARTS, type DayPart } from "@evinvest/sites-contract";
 import type { LeadCaptureFlowText } from "../core/lead-capture-text";
 import type { PartClassNames } from "./parts";
 import type { BookingReport } from "./use-booking";
@@ -51,7 +51,7 @@ function Tiles<T extends string>(props: { legend: string; name: string; options:
 export function LeadBookingManual(props: { leadRef: string; locale: string; now: number; text: LeadCaptureFlowText; report: BookingReport | null; classNames?: PartClassNames<BookingPart> | undefined }) {
   const { text, locale, classNames: c } = props;
   const [day, setDay] = useState<string | null>(null);
-  const [part, setPart] = useState<PreferredPart | null>(null);
+  const [part, setPart] = useState<DayPart | null>(null);
   const [state, setState] = useState<"idle" | "busy" | "sent" | "failed">("idle");
   const days = useMemo(() => {
     const fmt = new Intl.DateTimeFormat(locale, { weekday: "short", day: "numeric" });
@@ -60,7 +60,7 @@ export function LeadBookingManual(props: { leadRef: string; locale: string; now:
       return { value, label: fmt.format(new Date(`${value}T12:00:00`)) };
     });
   }, [locale, props.now]);
-  const parts = PREFERRED_PARTS.map(value => ({ value, label: { morning: text.partMorning, afternoon: text.partAfternoon, evening: text.partEvening }[value] }));
+  const parts = DAY_PARTS.map(value => ({ value, label: { morning: text.partMorning, afternoon: text.partAfternoon, evening: text.partEvening }[value] }));
   const report = props.report;
 
   const send = async (event: FormEvent) => {

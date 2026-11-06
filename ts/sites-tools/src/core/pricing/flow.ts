@@ -1,16 +1,13 @@
-import type { PricingInputs, PricingModel } from "./model";
-import { PRICING_LIMITS } from "./model";
+import { PRICING_LIMITS, type LeadFlow, type PricingInputs, type PricingModel } from "@evinvest/sites-contract";
+
+const SLUG = /* @__PURE__ */ new RegExp(PRICING_LIMITS.slug);
 
 /**
- * How a need is sold. `quote`: the price is uncertain, the lead asks for one.
- * `estimate`: the price follows from a few enum answers, shown live, then a
- * slot is booked. `fixed`: one price for a well-defined job, then a slot.
- * Chosen per need, not per site: one brand can mix them.
+ * A brand's flows by subject slug; a need left out is a `quote`. `quote`: the
+ * price is uncertain, the lead asks for one. `estimate`: the price follows from
+ * a few enum answers, shown live, then a slot is booked. `fixed`: one price for
+ * a well-defined job, then a slot. Chosen per need: one brand can mix them.
  */
-export type LeadFlow = "quote" | "estimate" | "fixed";
-export const LEAD_FLOWS: readonly LeadFlow[] = ["quote", "estimate", "fixed"];
-
-/** A brand's flows by subject slug; a need left out is a `quote`. */
 export type LeadFlows = Readonly<Record<string, LeadFlow>>;
 
 /**
@@ -57,7 +54,7 @@ export function readEstimateInputs(model: PricingModel, need: string, get: (fiel
   const out: Record<string, string> = {};
   for (const id of pricing.inputs) {
     const value = get(estimateField(id))?.trim();
-    if (value && PRICING_LIMITS.slug.test(value)) out[id] = value;
+    if (value && SLUG.test(value)) out[id] = value;
   }
   return out;
 }

@@ -5,9 +5,7 @@ import { fillText, formatCents } from "../core/lead-capture-format";
 import { flowTextOf, LEAD_CAPTURE_TEXT, type LeadCaptureText } from "../core/lead-capture-text";
 import { createPlaceView } from "../core/place/view";
 import { estimateField, flowOf, readEstimateInputs } from "../core/pricing/flow";
-import type { PricingModel } from "../core/pricing/model";
-import { PRICING_LIMITS } from "../core/pricing/model";
-import { priceOf } from "../core/pricing/price";
+import { PRICING_LIMITS, priceOf, type PricingModel } from "@evinvest/sites-contract";
 import { createRouting } from "../core/routing";
 import { bakedPlace, type Site } from "../core/site";
 import type { PricingSource } from "../server/pricing-source";
@@ -47,6 +45,7 @@ const escape = (s: string): string =>
   s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] ?? c);
 
 const SLUG = /^[a-z0-9_-]{1,40}$/;
+const PRICING_SLUG = /* @__PURE__ */ new RegExp(PRICING_LIMITS.slug);
 const CENTS = /^\d{1,12}$/;
 
 /**
@@ -66,7 +65,7 @@ export function confirmQuery(site: Pick<Site<string, string>, "lead">, form: For
   const subject = form.get(site.lead.wire.subject);
   if (typeof subject === "string" && site.lead.subjects.includes(subject)) query.set(site.lead.wire.subject, subject);
   for (const [name, value] of form) {
-    if (name.startsWith("estimate_") && typeof value === "string" && PRICING_LIMITS.slug.test(value) && SLUG.test(name.slice("estimate_".length))) query.set(name, value);
+    if (name.startsWith("estimate_") && typeof value === "string" && PRICING_SLUG.test(value) && PRICING_SLUG.test(name.slice("estimate_".length))) query.set(name, value);
   }
   const shown = form.get(SHOWN_CENTS_FIELD);
   if (typeof shown === "string" && CENTS.test(shown)) query.set(SHOWN_PARAM, shown);

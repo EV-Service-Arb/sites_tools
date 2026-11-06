@@ -1,4 +1,5 @@
-import { isPageProvider, type BookingChoice, type OpenBookingConfig } from "../core/booking/model";
+import { isPageProvider } from "@evinvest/sites-contract";
+import type { BookingChoice, OpenBookingConfig } from "../core/booking/model";
 import { bookingHref } from "../core/booking/url";
 
 /** What a provider may say about the slot it booked; all optional, never shown as is. */

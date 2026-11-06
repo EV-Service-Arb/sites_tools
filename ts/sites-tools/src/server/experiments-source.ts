@@ -1,21 +1,10 @@
 import "server-only";
 import { sitesPanelBrand } from "./env";
 import { unreachable, type Down } from "./fetched";
+import { parseLiveExperiments, type LiveExperiments } from "@evinvest/sites-contract";
 
-/**
- * An operator's override of one experiment, as the panel serves it — the
- * shape `applyOverrides` of `@evinvest/experiments` takes. Only the types are
- * checked here; whether a field fits the experiment in code (weights of the
- * right length, a holdout in `[0, 1)`) is `applyOverrides`' call, because only
- * it knows the code's variants.
- */
-export interface ExperimentOverride {
-  readonly enabled?: boolean;
-  readonly weights?: readonly number[];
-  readonly holdout?: number;
-}
-
-export type ExperimentOverrides = Readonly<Record<string, ExperimentOverride>>;
+/** The operator's overrides by experiment key, the shape `applyOverrides` of `@evinvest/experiments` takes. */
+export type ExperimentOverrides = LiveExperiments["experiments"];
 
 /**
  * The operator's overrides of the brand's experiments: `GET <sites_panel
@@ -48,27 +37,6 @@ export const EXPERIMENTS_TTL_MS = 30_000;
 const TIMEOUT_MS = 1_500;
 const NONE: ExperimentOverrides = Object.freeze({});
 
-const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
-
-/**
- * The panel's answer as overrides, or `null` when it is not the panel's shape.
- * A field of the wrong type is dropped, an entry that is not an object is
- * skipped; the rest stands.
- */
-export function parseExperimentOverrides(body: unknown): ExperimentOverrides | null {
-  if (!isRecord(body) || !isRecord(body["experiments"])) return null;
-  const out: Record<string, ExperimentOverride> = {};
-  for (const [key, entry] of Object.entries(body["experiments"])) {
-    if (!isRecord(entry)) continue;
-    const { enabled, weights, holdout } = entry;
-    out[key] = {
-      ...(typeof enabled === "boolean" ? { enabled } : {}),
-      ...(Array.isArray(weights) && weights.every((w): w is number => typeof w === "number") ? { weights } : {}),
-      ...(typeof holdout === "number" ? { holdout } : {}),
-    };
-  }
-  return out;
-}
 
 type FetchedExperiments = { kind: "live" | "empty"; overrides: ExperimentOverrides } | Down;
 
@@ -88,8 +56,8 @@ export async function fetchExperiments(brand: string, timeoutMs: number): Promis
   } catch (cause) {
     return { kind: "down", detail: "not JSON", cause };
   }
-  const overrides = parseExperimentOverrides(body);
-  if (overrides === null) return { kind: "down", detail: "not { experiments: {…} }" };
+  const overrides = parseLiveExperiments(body)?.experiments;
+  if (!overrides) return { kind: "down", detail: "not { experiments: {…} }" };
   return { kind: Object.keys(overrides).length === 0 ? "empty" : "live", overrides };
 }
 

@@ -434,7 +434,7 @@ import { messengerFacts } from "@evinvest/sites-tools";
   the return screen, and a second tap on the same lead is the same lead; the WhatsApp message ends with `Réf. AQ-7K3F`, the bot's
   `start` is the reference itself. Posted with every lead of the card (a
   `thanks` success sends the form lead's own), stored (`message_ref`, schema
-  8), mailed (`Réf.`), and sent to the panel under `panelMessenger`.
+  8), mailed (`Réf.`), and sent to the panel as `message_ref`.
 - **The message** (`messengerMessage`, ≤ 400 characters, nothing typed about
   the person): `Bonjour {brand} 👋`, the need with the estimate's answers
   («Ménage standard · 2 ch. · 40–70 m²»: each answer as
@@ -637,10 +637,10 @@ export const POST = quoteRoute(site, { env: serverEnv, notifier, pricing, unavai
   `needs` (`{ kind: "estimate", baseCents, inputs }` or `{ kind: "fixed",
   cents }`). `priceOf(model, need, answers) → { cents, breakdown } | null`
   is integer cents throughout, rounding half up at every product, then to
-  `roundToCents`, then the minimum. The rules and the shared fixtures the
-  panel holds its own port to are in
-  [`test/fixtures/pricing/`](./test/fixtures/pricing/README.md).
-  `defineSite` refuses a baked model that does not validate or lacks a label
+  `roundToCents`, then the minimum. The model, its check
+  (`checkPricingModel`) and `priceOf` are the panel's contract,
+  `@evinvest/sites-contract`, normative in sites_panel's
+  `contracts/vectors/pricing`. `defineSite` refuses a baked model that does not validate or lacks a label
   in one of the site's locales.
 - **The live list** (`createPricingSource`): `GET <brand>/pricing` (see
   [Live data](#live-data-sites_panel)), TTL
@@ -719,8 +719,6 @@ adapter, on the same seams.
 ```ts
 // shared/config/places.ts — baked, optional; the panel's place settings override it (`PlaceLive.booking`)
 { slug: "paris", …, booking: { default: "manual", providers: { google_calendar: { url: "https://calendar.app.google/…" } } } }
-// shared/config/site.ts — the Cal.com hosts a place may book on (default ["cal.evinvest.ltd", "cal.com"])
-export const site = defineSite({ …, booking: { calComHosts: ["cal.com", "cal.brand.fr"] } });
 // the page: the experiment's variant picks the provider among the place's
 <LeadCapture … bookingVariant={assignment(BOOKING_EXPERIMENT)} />
 // app/quote/booking/route.ts
@@ -740,10 +738,12 @@ export const POST = bookingRoute({ env: serverEnv, webhook });
   `name`, `attendeePhoneNumber` (E.164) and `metadata[ref]=<leadRef>`.
   `default` is `manual` or one of `providers`; a place with no booking is
   `manual` (`DEFAULT_BOOKING`). A ref always rides in the query, never the
-  fragment. `bookingConfigProblems` holds the strict URL rules; the panel
-  mirrors them from [`test/fixtures/booking/`](./test/fixtures/booking/README.md).
-  `defineSite` refuses a baked booking or host list that does not validate;
-  a live one that does not is dropped and the baked one kept.
+  fragment. The config and its URL rules are the panel's contract
+  (`checkBookingConfig`, sites_panel's `contracts/vectors/booking`); which
+  provider a visitor is offered and the link it opens are the site's
+  ([`test/fixtures/booking/`](./test/fixtures/booking/README.md)).
+  `defineSite` refuses a baked booking that does not validate; a live one
+  that does not is dropped and the baked one kept.
 - **The choice: one entry point.** `bookingOf(place, variant)` answers the
   provider the `booking_provider` variant (`BOOKING_EXPERIMENT`, the same key
   on every brand) names, when the place has it (`manual` always), else the
@@ -769,11 +769,10 @@ export const POST = bookingRoute({ env: serverEnv, webhook });
   preferred_date?, preferred_part? }` to `/quote/booking` (`bookingRoute`).
   The submission id proves the lead is this page's (a `lead_ref` alone books
   nothing); only a priced lead (`estimate`, `fixed`) books; one request per
-  lead. It is queued on the lead webhook's outbox behind `panelBooking` (off)
-  — see the lead webhook.
-- **`ctx.leadRef` is the panel's lead id.** A booking comes back to the panel
-  carrying `leadRef` (`metadata[ref]`, `ref`, `lead_ref`), so a brand's
-  `lead.created` must send `ctx.leadRef` as its lead id — not an id of its own.
+  lead. It is queued on the lead webhook's outbox — see the lead webhook. A
+  booking comes back to the panel carrying the lead's reference
+  (`metadata[ref]`, `ref`, `lead_ref`): the panel's lead id, which the kit's
+  `lead.created` sends.
 - **Weight.** The booking and the price confirmation add about 3.1 KB gz of
   first-load JS to the template's place page (170,853 → 173,979 B against
   its 158,000 B target: +10.1 %, within the 20 % tolerance).
@@ -936,9 +935,11 @@ sites_panel. `Cache-Control: no-store`:
 
 ## Lead webhook
 
-A signed POST of each lead to a receiver the brand names, delivered through an
-outbox in the leads file. The kit knows no receiver: the brand builds the body
-and passes the signing scheme; the kit serialises, signs, stores and retries.
+Each lead, as the Service-Arb panel's `lead.created@1`, POSTed signed through
+an outbox in the leads file. The receiver is the panel (through the
+conductor): the kit builds every body with `@evinvest/sites-contract`'s
+`siteEvent`, signs it with the panel's ingest scheme (`SA_INGEST_SIGNING`),
+stores it and retries it. A brand only names its need in words.
 
 ```ts
 // shared/config/env.ts
@@ -946,15 +947,7 @@ import { createServerEnv, leadWebhook, type LeadWebhook } from "@evinvest/sites-
 
 export const serverEnv = createServerEnv(site);
 let hook: LeadWebhook | null | undefined;
-export const webhook = (): LeadWebhook | null =>
-  (hook ??= leadWebhook(site, serverEnv(), {
-    // The receiver's scheme, all of it: the kit has no defaults.
-    signing: {
-      prefix: "sa-ingest/v1.",
-      headers: { keyId: "x-sa-key-id", timestamp: "x-sa-timestamp", signature: "x-sa-signature" },
-    },
-    buildBody: (lead, ctx) => ({ events: [/* the receiver's shape, from lead + ctx */] }),
-  }));
+export const webhook = (): LeadWebhook | null => (hook ??= leadWebhook(site, serverEnv(), { needLabel: subject => JOBS[subject] ?? subject }));
 
 // instrumentation.ts, in register(): resume the queue after a restart
 webhook()?.start();
@@ -963,81 +956,37 @@ webhook()?.start();
 export const POST = quoteRoute(site, { env: serverEnv, notifier, webhook, unavailable });
 ```
 
-- **Off unless both halves are there.** No `LEAD_WEBHOOK_URL`, or no
-  `buildBody` → `leadWebhook` returns `null`. With the URL,
-  `LEAD_WEBHOOK_KEY_ID` and `LEAD_WEBHOOK_SECRET` are required, and the URL
-  must be `https:`, or `http:` to a `*.svc` / `*.svc.cluster.local` host or
-  loopback — the body carries PII. All checked at boot.
-- **The channel.** `channelOf(lead)` is `form`, `callback`, `whatsapp` or
-  `telegram`. For the Service-Arb panel use `ctx.channel` (or
-  `panelChannel(channel, panelMessenger)`): its `properties.channel` is a
-  closed set that refuses the whole event outside it; a callback goes as
-  `callback` (panel v0.3.0 on), a messenger lead as `form` until
-  `panelMessenger` is on.
-- **Messenger leads: `panelMessenger`, off.** On: `ctx.channel` says
-  `whatsapp` / `telegram`, and `ctx.messageRef` carries the lead's chat
-  reference for `properties.message_ref`. Off (the default, until the panel
-  takes them): a messenger lead goes as a `form`, without its reference —
-  the leads table and the mail keep both either way.
-- **Queued before the 303, sent after it.** The body is built once, from the
-  lead and `ctx` (`leadId`, `brandId`, `locale`, `formId`, `at`, and a fresh
-  `idempotencyKey` for the receiver to deduplicate by), and written to the
-  `webhook_outbox` table before the visitor is thanked; the send runs in
-  `after`. A lead the notifier skips (honeypot, rate limit) is not queued —
-  unless `panelSuspect` (below) queues the rate-limited one.
-- **Suspect leads: `panelSuspect`, off.** `suspectOf(lead)` is
-  `rate_limited`, `too_fast` or nothing — never `honeypot`, whose lead goes
-  nowhere. With `leadWebhook(…, { panelSuspect: true })` a rate-limited lead
-  is queued too (still never mailed) and `ctx.suspect` names why a lead is
-  suspect, for the body's `suspect` property. Off by default, and to stay off
-  until the panel's `lead.created` accepts the property: it refuses an
-  unknown one, and the outbox would park the lead. Off, nothing changes.
-- **The visitor's language: `panelLocale`, off.** With
-  `leadWebhook(…, { panelLocale: true })` `ctx.panelLocale` is `fr` or `en`
-  (the site locale's language, `panelLocaleOf`; a locale the panel does not
-  take leaves it absent), and `panelLocaleProperties(ctx.panelLocale)` writes
-  it as `lead.created`'s `properties.locale`. Off by default, and to stay off
-  until the panel accepts the property — it refuses an unknown one, and the
-  outbox would park the lead. Off, the context and the body are as before.
-- **The sale: `panelFlow`, off.** With `leadWebhook(…, { panelFlow: true })`
-  `ctx.flow` says how the need was sold (`panelFlowOf(lead)`), and
-  `panelFlowProperties(ctx.flow)` writes it as `lead.created`'s properties:
-  `flow`; `quoted_cents` and `pricing_valid_from` together, for `estimate`
-  and `fixed` only; `estimate_inputs` (input → answer, slugs, at most 12)
-  for an `estimate` that asked anything. Off by default, and to stay off
-  until the panel accepts them — it refuses unknown properties, and the
-  outbox would park the lead.
-- **`ctx.leadRef` — send it as the panel's lead id.** The lead's reference
-  the page was answered with (`lead-<row>-<8 hex>`), whatever the switch.
-  Every booking joins its lead by it (Cal.com's `metadata[ref]`, a link's
-  `ref`, `booking.requested`'s `lead_ref`): **a brand must send this as the
-  panel lead id** in `lead.created`, not an id it computes itself.
-- **`ctx.analyticsId` — the visit, for PostHog.** The `distinct_id` of the
-  page's beacons (`AnalyticsBoundary` holds one per page, in memory), posted
-  by `LeadCapture`'s script as `analytics_id` and checked against
-  `[A-Za-z0-9._:-]{1,128}`. Write it as `lead.created`'s `analytics_id`
-  property so the panel's PostHog events of the lead join the visit — once
-  the panel accepts the property. Absent for a plain post, a page with no
-  analytics key, or an older page; never stored with the lead.
-- **Booking requests: `panelBooking`, off.** With `leadWebhook(…, {
-  panelBooking: true, buildBookingBody })`, `bookingRoute` queues
-  `booking.requested@1` through the same outbox, after the lead's
-  `lead.created`, once per lead (`requestBooking`; the row's ref is
+- **Off without `LEAD_WEBHOOK_URL`.** With it, `LEAD_WEBHOOK_KEY_ID` and
+  `LEAD_WEBHOOK_SECRET` are required, and the URL must be `https:`, or `http:`
+  to a `*.svc` / `*.svc.cluster.local` host or loopback — the body carries
+  PII. All checked at boot.
+- **The event.** `subject.leadId` is the lead's reference the page was
+  answered with (`lead-<row>-<8 hex>`), which every booking joins its lead
+  by; `subject.locationId` the place the form was posted from. `properties`:
+  `channel` (`form`, `callback`, `whatsapp`, `telegram`), a messenger lead's
+  `message_ref`, the sale (`flow`; `quoted_cents` and `pricing_valid_from`
+  for `estimate` and `fixed`; an estimate's `estimate_inputs`), `suspect`, and
+  the visit's `analytics_id` (the page's beacon id, checked against the
+  contract's shape). `pii`: the extras the form asked, `phone`, `need` (by
+  `needLabel`) and `locality`.
+- **Queued before the 303, sent after it.** The body is built once and
+  written to the `webhook_outbox` table before the visitor is thanked; the
+  send runs in `after`, and every retry sends the same body. A honeypot lead
+  goes nowhere; a rate-limited one is queued, marked `suspect`, never mailed.
+- **Booking requests.** `bookingRoute` queues `booking.requested@1` through
+  the same outbox, once per lead (`requestBooking`; the row's ref is
   `booking:<leadRef>`), held until the lead's own row (`lead:<row>`) is
   delivered — a `409` or `425` for it is retried, the panel not having the
-  lead yet — and never queued for a lead whose `lead.created` was not
-  (a suspect held back). `buildBookingBody(request, ctx)` builds the event —
-  `bookingRequestedProperties(request)` writes `{ lead_ref, provider,
-  preferred_date?, preferred_part? }`, `ctx` has `brandId`, `at`,
-  `idempotencyKey`. Off by default, and to stay off until the panel accepts
-  the event type: off, a request is answered and dropped.
+  lead yet — and never for a lead whose `lead.created` was not queued.
+- **Experiments.** `declareExperiments` queues `experiments.declared@1` at
+  every start, leaving out (and logging) an experiment the panel would refuse.
 - **The rate limit** is `LEAD_RATE_LIMIT` (`<count>/<seconds>`): 5 per 10
   minutes per address in production, 100 outside it, where every request of
   a local stack shares one address. Outside production a lead held back as
   rate-limited or honeypot is logged loudly.
-- **Signature.** Three headers named by `signing.headers`: the key id, the
-  timestamp (unix seconds) and `hex(HMAC-SHA256(secret, prefix + timestamp +
-  "." + body))`, signed afresh on each attempt. Prefix and names are required.
+- **Signature.** `x-sa-key-id`, `x-sa-timestamp` (unix seconds) and
+  `x-sa-signature`: `hex(HMAC-SHA256(secret, "sa-ingest/v1." + timestamp +
+  "." + body))`, signed afresh on each attempt.
 - **At-least-once.** 2xx is delivered. A `207` is delivered too, and an item
   it marks `rejected` is final — logged by index, not retried. 5xx, 408, 429
   and network errors retry, doubling from 5 s up to an hour (with jitter, and

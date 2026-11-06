@@ -11,7 +11,7 @@ import { flowTextOf, type LeadCaptureText } from "../core/lead-capture-text";
 import { bookingOf } from "../core/booking/model";
 import { servedLocalities, storefrontOf, type Place } from "../core/place/types";
 import { ESTIMATE_UNKNOWN, estimateField, flowOf, type LeadFlows } from "../core/pricing/flow";
-import type { PricingInput, PricingModel } from "../core/pricing/model";
+import type { PricingInput, PricingModel } from "@evinvest/sites-contract";
 import { labelOf } from "../core/pricing/label";
 import type { BookingAdapters } from "./booking-adapters";
 import { focusNext } from "./focus-next";

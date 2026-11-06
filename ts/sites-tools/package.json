@@ -129,6 +129,7 @@
     "dist/cli/sites-tools-size.js"
   ],
   "dependencies": {
+    "@evinvest/sites-contract": "^0.1.2",
     "qrcode-generator": "^2.0.4"
   }
 }

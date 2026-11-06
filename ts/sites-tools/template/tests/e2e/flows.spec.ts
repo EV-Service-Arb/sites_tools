@@ -145,7 +145,7 @@ test("a priced lead offers the place's Google schedule, loading nothing of Googl
   expect(tab.url()).toBe("https://calendar.app.google/BrandMenage");
   const res = await requested;
   expect(JSON.parse(res.request().postData() ?? "{}")).toMatchObject({ lead_ref: lead.lead, provider: "google_calendar" });
-  // Taken; with no lead webhook in the template, `panelBooking` is off and nothing is queued (unit-tested).
+  // Taken; with no lead webhook in the template nothing is queued (unit-tested).
   expect(res.status()).toBe(200);
 });
 

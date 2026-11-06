@@ -17,12 +17,21 @@ sites_tools/
 
 ```
  _sa/sites/{aquafix,vifnet} ──▶ sites_tools ──▶ web_std (@evinvest/*)
+                                    │
+                                    └──▶ sites_panel (@evinvest/sites-contract)
 ```
 
 ### Invariants
 
 - **One way.** Nothing outside `_sa` depends on this repo; this repo depends on
-  web_std only through published versions (npm ranges).
+  web_std and sites_panel only through published versions (npm ranges).
+- **The panel's contract is not ours.** What a site reads from sites_panel and
+  sends to it — the price list and its pricing, a place's live settings and
+  booking, phone numbers, the experiments' overrides, every ingest event — is
+  `@evinvest/sites-contract`, sites_panel's one TS form of it. The kit imports
+  it and re-exports what a brand needs; it restates none of it, and builds
+  every event with its `siteEvent`. A change to it is a sites_panel release
+  first.
 - **A brand pins one release.** `lib.mkLanding` refuses a lockfile whose
   `@evinvest/sites-tools` is not this revision's `ts/sites-tools/package.json`, so a
   brand's flake input is the `@evinvest/sites-tools-vX.Y.Z` tag of its npm version.

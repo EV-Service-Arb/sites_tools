@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync } from "node:fs";
+import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -16,8 +16,6 @@ import {
   messengerFacts,
   messengerMessage,
   newMessageRef,
-  parsePlaceLive,
-  parsePricingModel,
   RateLimiter,
   readCandidate,
   telegramHref,
@@ -28,8 +26,9 @@ import {
   type LeadSchema,
   type PricingModel,
 } from "../src/index";
+import { MODEL as BAKED } from "./support/fixtures";
 import { quoteRoute } from "../src/next/index";
-import { defaultLeadMail, leadWebhook, openSqliteLeadStore, type LeadWebhookContext, type WebhookOutbox } from "../src/server/index";
+import { defaultLeadMail, leadWebhook, openSqliteLeadStore, type WebhookOutbox } from "../src/server/index";
 import { messengerRuleDisagreements } from "../src/testing/index";
 import { serviceAreaPlace, storefrontPlace } from "../src/testing/fixtures";
 import { fixtureSite } from "./support/fixtures";
@@ -215,7 +214,7 @@ describe("accepting a messenger lead", () => {
 });
 
 describe("the quote route and a messenger lead", () => {
-  const BAKED = parsePricingModel(JSON.parse(readFileSync(join(import.meta.dirname, "fixtures/pricing/valid/cleaning.json"), "utf8")));
+
   const LIVE: PricingModel = { ...BAKED, validFrom: "2026-11-01", minimumCents: 9900 };
   const aquafix = fixtureSite("aquafix");
   const priced = defineSite({ ...aquafix, lead: { ...aquafix.lead, subjects: ["standard", "other"], flows: { standard: "estimate" } }, pricing: BAKED });
@@ -321,36 +320,21 @@ describe("the webhook and a messenger lead", () => {
     for (const o of opened.splice(0)) o.close();
   });
 
-  function hook(panelMessenger: boolean | undefined) {
-    const seen: LeadWebhookContext[] = [];
+  it("sends the channel and the reference the chat carries", async () => {
+    const posted: string[] = [];
     const h = leadWebhook(fixtureSite("aquafix"), { leadsDb: { kind: "sqlite", path: ":memory:" }, leadWebhook: { url: "http://panel.local/ingest", keyId: "k", secret: "s" } }, {
-      signing: { prefix: "p.", headers: { keyId: "x-k", timestamp: "x-t", signature: "x-s" } },
-      buildBody: (_lead, ctx) => (seen.push(ctx), {}),
-      fetch: vi.fn(async () => new Response(null, { status: 200 })),
+      needLabel: subject => subject,
+      fetch: vi.fn(async (_url: string | URL | Request, init?: RequestInit) => (posted.push(String(init?.body)), new Response(null, { status: 200 }))),
       log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
-      ...(panelMessenger === undefined ? {} : { panelMessenger }),
     });
     if (!h) throw new Error("expected the webhook on");
     opened.push(h.outbox);
-    return { h, seen };
-  }
-
-  it("sends a messenger lead as a form, without its reference, until the panel takes messengers", () => {
-    for (const off of [undefined, false]) {
-      const { h, seen } = hook(off);
-      expect(h.panelMessenger).toBe(false);
-      h.enqueue(lead({ channel: "whatsapp", messageRef: "AQ-7K3F" }), 1, { locale: "fr", formId: "quote" });
-      expect(seen[0]?.channel).toBe("form");
-      expect(seen[0]).not.toHaveProperty("messageRef");
-    }
-  });
-
-  it("sends the channel and the reference once the panel takes them", () => {
-    const { h, seen } = hook(true);
-    h.enqueue(lead({ channel: "whatsapp", messageRef: "AQ-7K3F" }), 1, { locale: "fr", formId: "quote" });
-    h.enqueue(lead({ channel: "telegram" }), 2, { locale: "fr", formId: "quote" });
-    h.enqueue(lead({ channel: "callback", mobile: "0612345678" }), 3, { locale: "fr", formId: "quote" });
-    expect(seen.map(c => [c.channel, c.messageRef ?? null])).toEqual([
+    h.enqueue(lead({ channel: "whatsapp", messageRef: "AQ-7K3F" }), 1, { leadRef: "lead-1-00000001" });
+    h.enqueue(lead({ channel: "telegram" }), 2, { leadRef: "lead-2-00000002" });
+    h.enqueue(lead({ channel: "callback", mobile: "0612345678" }), 3, { leadRef: "lead-3-00000003" });
+    await h.tick();
+    const sent = posted.flatMap(b => (JSON.parse(b) as { events: { properties: { channel: string; message_ref?: string } }[] }).events);
+    expect(sent.map(e => [e.properties.channel, e.properties.message_ref ?? null])).toEqual([
       ["whatsapp", "AQ-7K3F"],
       ["telegram", null],
       ["callback", null],
@@ -379,25 +363,10 @@ describe("the lead mail for a messenger lead", () => {
 });
 
 describe("a place's messengers", () => {
-  it("reads the bot and the panel's switches off the live answer, dropping what does not read", () => {
-    expect(parsePlaceLive({ telegram: "@aquafix_devis_bot", messengers: { whatsapp: false, telegram: "yes" } }, ["fr"])).toEqual({
-      telegram: "aquafix_devis_bot",
-      messengers: { whatsapp: false },
-    });
-    // Telegram's rule: 5 to 32 characters, a letter first, `bot` last.
-    expect(parsePlaceLive({ telegram: "a_bot" }, ["fr"])).toEqual({ telegram: "a_bot" });
-    expect(parsePlaceLive({ telegram: `A${"b".repeat(28)}Bot` }, ["fr"])).toEqual({ telegram: `A${"b".repeat(28)}Bot` });
-    for (const bot of ["abot", "abcd", "aquafix_devis", "1aquafix_bot", "aquafix devis_bot", `a${"b".repeat(29)}bot`, "", 42]) {
-      expect(parsePlaceLive({ telegram: bot }, ["fr"]), String(bot)).toEqual({});
-    }
-    expect(parsePlaceLive({ messengers: { whatsapp: "off" } }, ["fr"])).toEqual({});
-    expect(parsePlaceLive({ messengers: [] }, ["fr"])).toEqual({});
-  });
-
   it("merges the live bot and switches over the baked ones", () => {
     const baked = serviceAreaPlace(["fr"], { channels: { phone: null, whatsapp: "+33612345678", telegram: "baked_devis_bot" }, messengers: { telegram: false } });
-    expect(mergeLive(baked, {})).toMatchObject({ channels: { telegram: "baked_devis_bot" }, messengers: { telegram: false } });
-    const merged = mergeLive(baked, { telegram: "aquafix_devis_bot", messengers: { whatsapp: false } });
+    expect(mergeLive(baked, {}, ["fr"])).toMatchObject({ channels: { telegram: "baked_devis_bot" }, messengers: { telegram: false } });
+    const merged = mergeLive(baked, { telegram: "aquafix_devis_bot", messengers: { whatsapp: false } }, ["fr"]);
     expect(merged.channels).toEqual({ phone: null, whatsapp: "+33612345678", telegram: "aquafix_devis_bot" });
     expect(merged.messengers).toEqual({ whatsapp: false });
   });

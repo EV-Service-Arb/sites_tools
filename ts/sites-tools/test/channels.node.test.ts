@@ -3,9 +3,7 @@ import {
   channelHref,
   isMobilePhone,
   isOpenAt,
-  isPlausiblePhone,
   nextOpening,
-  normalizePhone,
   resolveChannels,
   smsHref,
   type OpeningHours,
@@ -20,25 +18,6 @@ const FRIDAY_20H = new Date("2026-10-09T18:00:00Z");
 const SATURDAY_NOON = new Date("2026-10-10T10:00:00Z");
 
 describe("a phone number", () => {
-  it.each([
-    ["06 12 34 56 78", "+33612345678"],
-    ["06.12.34.56.78", "+33612345678"],
-    ["+33 6 12 34 56 78", "+33612345678"],
-    ["+33 (0)6 12 34 56 78", "+33612345678"],
-    ["0033 6 12 34 56 78", "+33612345678"],
-    ["6 12 34 56 78", "+33612345678"],
-    ["01 23 45 67 89", "+33123456789"],
-    ["+44 7911 123456", "+447911123456"],
-  ])("reads %s as %s", (raw, e164) => {
-    expect(normalizePhone(raw)).toBe(e164);
-    expect(isPlausiblePhone(raw)).toBe(true);
-  });
-
-  it.each(["0612", "", "+33 6 12 34", "+33 6 12 34 56 78 90", "06 12 34 56 7a", "call me"])("does not read %j, and says so softly", raw => {
-    expect(normalizePhone(raw)).toBeNull();
-    expect(isPlausiblePhone(raw)).toBe(false);
-  });
-
   it("knows a French mobile from a landline", () => {
     expect(isMobilePhone("07 12 34 56 78")).toBe(true);
     expect(isMobilePhone("+33 6 12 34 56 78")).toBe(true);

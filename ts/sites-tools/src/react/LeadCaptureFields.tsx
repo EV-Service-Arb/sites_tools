@@ -4,7 +4,7 @@ import { Button, cn, Field, FieldDescription, FieldError, FieldLabel, Input } fr
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import type { LeadCaptureText } from "../core/lead-capture-text";
 import { CONSENT_FIELD } from "../core/lead";
-import { phoneProblem } from "../core/phone";
+import { phoneProblem } from "@evinvest/sites-contract";
 import type { PartClassNames } from "./parts";
 import { PHONE_INPUT_PROPS } from "./QuoteFormShell";
 import { useValidity } from "./use-validity";

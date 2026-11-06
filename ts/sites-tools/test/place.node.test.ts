@@ -6,13 +6,13 @@ import {
   isPublished,
   mergeLive,
   parseInstant,
-  parsePlaceLive,
   placeUrl,
   publicationGaps,
   servedLocalities,
   SERVICE_AREA_GATE,
   STOREFRONT_GATE,
   type Place,
+  type PlaceLive,
 } from "../src/index";
 import { fixtureSite, viaJson } from "./support/fixtures";
 
@@ -114,44 +114,24 @@ describe("where a place's canonical URL lives", () => {
 });
 
 describe("the live overlay", () => {
-  it("keeps what validates and drops what does not", () => {
-    const live = parsePlaceLive(
-      {
-        phone: "+33 4 00 00 00 00",
-        whatsapp: "06 12 34 56 78", // national: cannot become wa.me, dropped
-        storefrontPhoto: "http://insecure.example/x.jpg", // not https, dropped
-        hours: [{ days: ["Monday"], opens: "07:00", closes: "21:00" }],
-        serviceArea: ["Royat", 3, "Ceyrat"],
-        rating: { value: 9, count: 1, fetchedAt: "2026-09-20" }, // out of range, dropped
-        address: { street: "1 Rue X", postalCode: "6313", locality: "Royat" }, // bad CP, dropped
-      },
-      ["fr", "en"],
-    );
-    expect(live).toEqual({
-      phone: "+33 4 00 00 00 00",
-      hours: [{ days: ["Monday"], opens: "07:00", closes: "21:00" }],
-      serviceArea: [{ kind: "localities", names: ["Royat", "Ceyrat"] }],
-    });
-  });
-
-  const live = parsePlaceLive(
-    {
-      address: { street: "1 Rue X", postalCode: "63130", locality: "Royat" },
-      geo: { lat: 1, lng: 2 },
-      storefrontPhoto: "https://cdn.example/x.jpg",
-      phone: "+33 4 22 22 22 22",
-    },
-    ["fr", "en"],
-  );
+  const L = ["fr", "en"] as const;
+  const live: PlaceLive = {
+    address: { street: "1 Rue X", postalCode: "63130", locality: "Royat" },
+    geo: { lat: 1, lng: 2 },
+    storefrontPhoto: "https://cdn.example/x.jpg",
+    phone: "+33422222222",
+    serviceArea: ["Royat", "Ceyrat"],
+  };
 
   it("never gives a service-area place a front", () => {
-    const merged = mergeLive(sab(), live);
+    const merged = mergeLive(sab(), live, L);
     expect(merged.presence).toEqual({ kind: "service-area" });
-    expect(merged.channels.phone).toBe("+33 4 22 22 22 22");
+    expect(merged.channels.phone).toBe("+33422222222");
+    expect(merged.serviceArea).toEqual([{ kind: "localities", names: ["Royat", "Ceyrat"] }]);
   });
 
   it("merges a storefront's fields", () => {
-    expect(mergeLive(royat(), live).presence).toMatchObject({
+    expect(mergeLive(royat(), live, L).presence).toMatchObject({
       kind: "storefront",
       address: { street: "1 Rue X", postalCode: "63130", locality: "Royat", country: "FR" },
       geo: { lat: 1, lng: 2 },
@@ -160,12 +140,9 @@ describe("the live overlay", () => {
   });
 
   it("takes a landmark only in every language", () => {
-    expect(parsePlaceLive({ landmark: { fr: "Ici" } }, ["fr", "en"])).toEqual({});
-    expect(parsePlaceLive({ landmark: { fr: "Ici", en: "Here" } }, ["fr", "en"])).toEqual({ landmark: { fr: "Ici", en: "Here" } });
-  });
-
-  it("refuses a body that is not an object", () => {
-    expect(() => parsePlaceLive([], ["fr"])).toThrow(/not an object/);
+    const baked = royat().presence;
+    expect(mergeLive(royat(), { landmark: { fr: "Ici" } }, L).presence).toEqual(baked);
+    expect(mergeLive(royat(), { landmark: { fr: "Ici", en: "Here" } }, L).presence).toMatchObject({ landmark: { fr: "Ici", en: "Here" } });
   });
 });
 
@@ -185,7 +162,6 @@ describe("the rating", () => {
     expect(parseInstant("2026-09-01T10:00:00")).toBeNull();
     expect(parseInstant("Sep 1 2026")).toBeNull();
     expect(freshRating(rated("2026-09-20T10:00:00"), NOW)).toBeNull();
-    expect(parsePlaceLive({ rating: { value: 4, count: 3, fetchedAt: "2026-09-20T10:00:00" } }, ["fr"])).toEqual({});
   });
 });
 
@@ -196,69 +172,20 @@ describe("served localities", () => {
   });
 });
 
-describe("a place's booking, live over baked", () => {
+describe("a place's booking and review link, live over baked", () => {
   const cal = { default: "cal_com", providers: { cal_com: { url: "https://cal.com/brand/menage" } } } as const;
   const manual = { default: "manual", providers: {} } as const;
-
-  it("takes a valid booking from the source", () => {
-    expect(parsePlaceLive({ booking: cal }, ["fr"])).toEqual({ booking: cal });
-    expect(parsePlaceLive({ booking: manual }, ["fr"])).toEqual({ booking: manual });
-  });
-
-  it("drops a booking that does not validate, and keeps the rest", () => {
-    const body = { phone: "+33 4 00 00 00 00", booking: { default: "link", providers: { link: { url: "http://x.example/a" } } } };
-    expect(parsePlaceLive(body, ["fr"])).toEqual({ phone: "+33 4 00 00 00 00" });
-    expect(parsePlaceLive({ booking: { provider: "cal_com", url: "https://cal.com/a/b" } }, ["fr"])).toEqual({});
-    expect(parsePlaceLive({ booking: null }, ["fr"])).toEqual({});
-  });
-
-  it("holds a cal_com host to the site's list", () => {
-    const own = { default: "cal_com", providers: { cal_com: { url: "https://cal.brand.fr/brand/menage" } } };
-    expect(parsePlaceLive({ booking: own }, ["fr"])).toEqual({});
-    expect(parsePlaceLive({ booking: own }, ["fr"], { calComHosts: ["cal.com", "cal.brand.fr"] })).toEqual({ booking: own });
-  });
+  const L = ["fr"] as const;
 
   it("merges the live booking over the baked one, and leaves none when neither has one", () => {
-    expect(mergeLive(sab(), { booking: cal }).booking).toEqual(cal);
-    expect(mergeLive(sab({ booking: cal }), {}).booking).toEqual(cal);
-    expect(mergeLive(sab({ booking: cal }), { booking: manual }).booking).toEqual(manual);
-    expect("booking" in mergeLive(sab(), {})).toBe(false);
-  });
-});
-
-describe("a place's review link, live only", () => {
-  const writeReview = "https://search.google.com/local/writereview?placeid=x";
-
-  it("takes Google's own review links over https", () => {
-    expect(parsePlaceLive({ reviewUrl: "https://g.page/r/x" }, ["fr"])).toEqual({ reviewUrl: "https://g.page/r/x" });
-    expect(parsePlaceLive({ reviewUrl: writeReview }, ["fr"])).toEqual({ reviewUrl: writeReview });
+    expect(mergeLive(sab(), { booking: cal }, L).booking).toEqual(cal);
+    expect(mergeLive(sab({ booking: cal }), {}, L).booking).toEqual(cal);
+    expect(mergeLive(sab({ booking: cal }), { booking: manual }, L).booking).toEqual(manual);
+    expect("booking" in mergeLive(sab(), {}, L)).toBe(false);
   });
 
-  it("drops a link on another host, even one that merely starts or ends like Google's", () => {
-    for (const bad of ["https://evil.example/r/x", "https://g.page.evil.example/r/x", "https://evil-g.page/r/x", "https://search.google.com.evil.example/local/writereview"]) {
-      expect(parsePlaceLive({ reviewUrl: bad }, ["fr"])).toEqual({});
-    }
-  });
-
-  it("drops a link whose userinfo names Google while the host is someone else's", () => {
-    expect(parsePlaceLive({ reviewUrl: "https://g.page@evil.example/r/x" }, ["fr"])).toEqual({});
-    expect(parsePlaceLive({ reviewUrl: "https://g.page:pw@evil.example/r/x" }, ["fr"])).toEqual({});
-  });
-
-  it("drops a link that is not https", () => {
-    expect(parsePlaceLive({ reviewUrl: "http://g.page/r/x" }, ["fr"])).toEqual({});
-    expect(parsePlaceLive({ reviewUrl: "javascript:alert(1)//g.page" }, ["fr"])).toEqual({});
-  });
-
-  it("drops a value that is not a string, and keeps the rest of the body", () => {
-    for (const bad of [null, 42, true, {}, ["https://g.page/r/x"], ""]) {
-      expect(parsePlaceLive({ reviewUrl: bad }, ["fr"])).toEqual({});
-    }
-    expect(parsePlaceLive({ phone: "+33 4 00 00 00 00", reviewUrl: "https://evil.example/x" }, ["fr"])).toEqual({ phone: "+33 4 00 00 00 00" });
-  });
-
-  it("merges the live link into the place, and leaves the field out when there is none", () => {
-    expect(mergeLive(sab(), { reviewUrl: "https://g.page/r/x" }).reviewUrl).toBe("https://g.page/r/x");
-    expect("reviewUrl" in mergeLive(sab(), {})).toBe(false);
+  it("merges the live review link into the place, and leaves the field out when there is none", () => {
+    expect(mergeLive(sab(), { reviewUrl: "https://g.page/r/x" }, L).reviewUrl).toBe("https://g.page/r/x");
+    expect("reviewUrl" in mergeLive(sab(), {}, L)).toBe(false);
   });
 });

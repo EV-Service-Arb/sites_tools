@@ -11,9 +11,8 @@
  */
 
 import { MESSAGE_REF_FIELD, messageRefOf } from "./messenger";
-import { normalizePhone, phoneProblem } from "./phone";
-import type { LeadFlow, LeadFlows } from "./pricing/flow";
-import type { PricingInputs } from "./pricing/model";
+import { normalizePhone, phoneProblem, SITE_CHANNELS, type LeadFlow, type LeadSuspect, type PricingInputs, type SiteChannel } from "@evinvest/sites-contract";
+import type { LeadFlows } from "./pricing/flow";
 
 /** Why a submission was kept but not acted on. `null` is a clean lead. */
 export type SpamVerdict = "honeypot" | "too-fast" | "rate-limited";
@@ -105,14 +104,12 @@ export interface LeadSchema<S extends string> {
  * posted first (`whatsapp`, `telegram`). Posted as `CHANNEL_FIELD`; anything
  * else, or nothing (a page cached before the field existed), is `form`.
  */
-export type LeadChannel = "form" | "callback" | "whatsapp" | "telegram";
-export const LEAD_CHANNELS: readonly LeadChannel[] = ["form", "callback", "whatsapp", "telegram"];
 export const CHANNEL_FIELD = "channel";
 
 /** A lead whose answer goes by chat: the phone is optional, no consent is asked. */
-export type MessengerChannel = Extract<LeadChannel, "whatsapp" | "telegram">;
+export type MessengerChannel = Extract<SiteChannel, "whatsapp" | "telegram">;
 
-export function isMessengerChannel(channel: LeadChannel | undefined): channel is MessengerChannel {
+export function isMessengerChannel(channel: SiteChannel | undefined): channel is MessengerChannel {
   return channel === "whatsapp" || channel === "telegram";
 }
 
@@ -141,7 +138,7 @@ export const LEAD_ERROR_PARAM = "lead_error";
 /** A refusal the server sent back: which of the card's forms, and the field it is about. */
 export interface LeadError {
   /** A messenger lead is posted behind the visitor's back: no form of the card shows its refusal. */
-  channel: Extract<LeadChannel, "form" | "callback">;
+  channel: Extract<SiteChannel, "form" | "callback">;
   field: string;
 }
 
@@ -216,7 +213,7 @@ export function rejectionOf(verdict: LeadVerdict): LeadRejection | null {
  * (`phoneProblem`). A messenger lead needs none, but one typed must be a
  * number: the operator may call it.
  */
-export function validateLead(lead: Pick<LeadCandidate, "mobile"> & { channel?: LeadChannel | undefined }): LeadRejection | null {
+export function validateLead(lead: Pick<LeadCandidate, "mobile"> & { channel?: SiteChannel | undefined }): LeadRejection | null {
   if (isMessengerChannel(lead.channel) && lead.mobile.trim() === "") return null;
   const problem = phoneProblem(lead.mobile);
   return problem === null ? null : { field: "phone", why: problem === "required" ? "a phone number" : "a phone number we can call" };
@@ -245,7 +242,7 @@ export interface Lead {
    * Absent on a lead built before the field existed — read it as `form`
    * (`channelOf`). Every lead the funnel reads has it.
    */
-  channel?: LeadChannel;
+  channel?: SiteChannel;
   /** Only on a callback lead: the consent it was posted with. */
   consent?: LeadConsent;
   /**
@@ -282,9 +279,6 @@ export interface LeadPrice {
   inputs?: PricingInputs;
 }
 
-/** What the panel may be told of a suspected lead. */
-export type LeadSuspect = "rate_limited" | "too_fast";
-
 /**
  * Why a lead the panel receives is suspect, for its `suspect` property, or
  * nothing for a clean one. Never `honeypot`: a lead that filled the trap is a
@@ -297,7 +291,7 @@ export function suspectOf(lead: Pick<Lead, "spamVerdict">): LeadSuspect | undefi
 }
 
 /** The lead's channel, `form` for one that predates the field. */
-export function channelOf(lead: Pick<Lead, "channel">): LeadChannel {
+export function channelOf(lead: Pick<Lead, "channel">): SiteChannel {
   return lead.channel ?? "form";
 }
 
@@ -379,7 +373,7 @@ export function readCandidate(
   }
   const mobile = field(form, schema.wire.mobile, MAX_FIELD) ?? "";
   const posted = form.get(CHANNEL_FIELD);
-  const channel = LEAD_CHANNELS.find(c => c === posted) ?? "form";
+  const channel = SITE_CHANNELS.find(c => c === posted) ?? "form";
   const consent = channel === "callback" ? field(form, CONSENT_FIELD, MAX_CONSENT) : null;
   const submission = field(form, SUBMISSION_FIELD, 64);
   const messageRef = messageRefOf(form.get(MESSAGE_REF_FIELD));

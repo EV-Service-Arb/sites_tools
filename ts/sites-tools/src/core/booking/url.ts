@@ -1,4 +1,4 @@
-import { normalizePhone } from "../phone";
+import { normalizePhone } from "@evinvest/sites-contract";
 import type { BookingChoice } from "./model";
 
 /** What the page knows of the lead when the visitor asks for a slot. */

@@ -2,7 +2,15 @@ import { telHref, whatsappHref } from "./contact";
 import { DEFAULT_TIME_ZONE, isOpenAt, nextOpening, type Opening } from "./place/hours";
 import type { OpeningHours } from "./place/types";
 import { telegramHref } from "./messenger";
-import { isMobilePhone, normalizePhone } from "./phone";
+import { normalizePhone } from "@evinvest/sites-contract";
+
+/**
+ * A French mobile (`+33 6…`, `+33 7…`) — the one kind an SMS reaches. A
+ * landline answers a text with silence, so the channel is not offered for it.
+ */
+export function isMobilePhone(raw: string): boolean {
+  return /^\+33[67]\d{8}$/.test(normalizePhone(raw) ?? "");
+}
 
 /**
  * The ways a visitor can reach the business, named as `contact_intent_click`

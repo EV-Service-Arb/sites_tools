@@ -1,4 +1,5 @@
 import { createBeaconSink, type AnalyticsSink } from "@evinvest/analytics";
+import { LEAD_LIMITS } from "@evinvest/sites-contract";
 import { THANKS } from "./routing";
 
 /**
@@ -100,9 +101,9 @@ export const ALLOWED_PROPS = [
 /**
  * The beacon's `distinct_id` as a lead may carry it to the panel
  * (`lead.created`'s `analytics_id`), so PostHog can join the lead to the
- * visit. The panel's own rule; anything else is dropped, never refused.
+ * visit; anything else is dropped, never refused.
  */
-export const ANALYTICS_ID = /^[A-Za-z0-9._:-]{1,128}$/;
+export const ANALYTICS_ID = /* @__PURE__ */ new RegExp(LEAD_LIMITS.analyticsId);
 
 /** What an experiment's assignment looks like on the wire: short slugs, nothing a person typed. */
 export const EXPERIMENT_SLUG = /^[a-z0-9_-]{1,32}$/;

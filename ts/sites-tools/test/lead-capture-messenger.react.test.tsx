@@ -1,13 +1,12 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import type { AnalyticsSink } from "@evinvest/analytics";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { LEAD_CAPTURE_MESSENGER_TEXT, LEAD_CAPTURE_TEXT, MESSAGE_REF, parsePricingModel, type MessengerFacts, type MessengerKind, type MessengerVariant } from "../src/index";
+import { LEAD_CAPTURE_MESSENGER_TEXT, LEAD_CAPTURE_TEXT, MESSAGE_REF, type MessengerFacts, type MessengerKind, type MessengerVariant } from "../src/index";
 import { AnalyticsSinkContext } from "../src/react/analytics-context";
 import { LeadCapture, type LeadCaptureProps } from "../src/react/index";
 import { serviceAreaPlace } from "../src/testing/index";
+import { MODEL } from "./support/fixtures";
 
 const T = LEAD_CAPTURE_TEXT.fr;
 const M = LEAD_CAPTURE_MESSENGER_TEXT.fr;
@@ -724,7 +723,6 @@ describe("the swap variant on a computer", () => {
 });
 
 describe("an estimate's answers in the message", () => {
-  const MODEL = parsePricingModel(JSON.parse(readFileSync(join(import.meta.dirname, "fixtures/pricing/valid/cleaning.json"), "utf8")));
   const estimate = (over: Partial<LeadCaptureProps> = {}) =>
     card("segment", {
       needs: [{ value: "standard", label: "Ménage courant" }],

@@ -1,4 +1,6 @@
-import type { BookingConfig } from "../booking/model";
+import type { Address, BookingConfig, DayOfWeek, Geo, OpeningHours, PlaceLive, Rating } from "@evinvest/sites-contract";
+
+export type { DayOfWeek, Geo, OpeningHours, Rating };
 /**
  * The place model. Three words, one each:
  *
@@ -13,41 +15,12 @@ import type { BookingConfig } from "../booking/model";
  * to ask `presence.kind` first.
  */
 
-export type DayOfWeek = "Monday" | "Tuesday" | "Wednesday" | "Thursday" | "Friday" | "Saturday" | "Sunday";
-
-export interface PostalAddress {
-  street: string;
-  postalCode: string;
-  locality: string;
+export type PostalAddress = Address & {
   /** Région administrative, as schema.org `addressRegion`. */
   region: string;
   /** ISO 3166-1 alpha-2. */
   country: string;
-}
-
-export interface Geo {
-  lat: number;
-  lng: number;
-}
-
-export interface OpeningHours {
-  days: readonly DayOfWeek[];
-  /** `HH:MM`, local time. */
-  opens: string;
-  closes: string;
-}
-
-/**
- * Google's rating for the place, mirrored from the Business Profile API. Never
- * baked: it exists only when the live source supplied it, and the API's terms
- * cap how long a copy may be shown, so `fetchedAt` travels with it.
- */
-export interface Rating {
-  value: number;
-  count: number;
-  /** ISO 8601. */
-  fetchedAt: string;
-}
+};
 
 /** Where the van goes: named communes, or a radius around a centre. */
 export type ServiceArea =
@@ -100,10 +73,7 @@ export interface Place<L extends string> {
 }
 
 /** Which messengers the panel lets a place offer; a key left out is on. */
-export interface MessengerSwitches {
-  whatsapp?: boolean;
-  telegram?: boolean;
-}
+export type MessengerSwitches = NonNullable<PlaceLive["messengers"]>;
 
 /** The storefront half of a place, or `null` for a service-area business. */
 export function storefrontOf<L extends string>(

@@ -1,8 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { declarationProblem, declareExperiments, experimentsDeclaredBody, leadWebhook, signWebhook, type LeadWebhook, type WebhookOutbox } from "../src/server/index";
+import { declareExperiments, experimentsDeclaredBody, leadWebhook, SA_INGEST_SIGNING, signWebhook, type LeadWebhook, type WebhookOutbox } from "../src/server/index";
 import { fixtureSite } from "./support/fixtures";
 
-const SIGNING = { prefix: "sa-ingest/v1.", headers: { keyId: "x-sa-key-id", timestamp: "x-sa-timestamp", signature: "x-sa-signature" } };
 const site = fixtureSite("aquafix");
 const AT = new Date("2026-10-04T10:00:00.000Z");
 const UUID_V7 = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -24,8 +23,7 @@ function wired(answer = new Response(null, { status: 207 })) {
     return answer.clone();
   });
   const hook = leadWebhook(site, { leadsDb: { kind: "sqlite", path: ":memory:" }, leadWebhook: { url: "http://panel.sa.svc.cluster.local/api/ingest/v1/events", keyId: "aquafix-site", secret: "s3cret" } }, {
-    signing: SIGNING,
-    buildBody: () => ({}),
+    needLabel: subject => subject,
     fetch: fetch as unknown as typeof globalThis.fetch,
     now: () => AT.getTime(),
     log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
@@ -40,6 +38,7 @@ describe("experiments.declared@1", () => {
     const { body, skipped } = experimentsDeclaredBody(experiments, { brandId: "aquafix", sourceId: "aquafix-site", at: AT, summaries: { hero: "A shorter hero converts better" } });
     expect(skipped).toEqual([]);
     const [event] = body.events;
+    if (!event) throw new Error("one event");
     expect(event.id).toMatch(UUID_V7);
     expect(event).toEqual({
       id: event.id,
@@ -60,24 +59,22 @@ describe("experiments.declared@1", () => {
 
   it("carries the time in its UUIDv7 and a new id every start", () => {
     const ctx = { brandId: "aquafix", sourceId: "aquafix-site", at: AT };
-    const a = experimentsDeclaredBody(experiments, ctx).body.events[0].id;
-    const b = experimentsDeclaredBody(experiments, ctx).body.events[0].id;
+    const [a = "", b = ""] = [experimentsDeclaredBody(experiments, ctx), experimentsDeclaredBody(experiments, ctx)].map(d => d.body.events[0]?.id);
     expect(a).not.toBe(b);
     expect(parseInt(a.replaceAll("-", "").slice(0, 12), 16)).toBe(AT.getTime());
   });
 
   it.each([
-    ["Lead-Layout", { variants: ["a", "b"] }, undefined, /key/],
-    ["k", { variants: ["a"] }, undefined, /two variants/],
-    ["k", { variants: ["a", "a"] }, undefined, /twice/],
-    ["k", { variants: ["a", "B c"] }, undefined, /slug/],
-    ["k", { variants: ["a", "b"], holdout: 1 }, undefined, /holdout/],
-    ["k", { variants: ["a", "b"] }, "x".repeat(201), /summary/],
+    ["Lead-Layout", { variants: ["a", "b"] }, undefined, "key"],
+    ["k", { variants: ["a"] }, undefined, "variants"],
+    ["k", { variants: ["a", "a"] }, undefined, "duplicate_variant"],
+    ["k", { variants: ["a", "B c"] }, undefined, "variant"],
+    ["k", { variants: ["a", "b"], holdout: 1 }, undefined, "holdout"],
+    ["k", { variants: ["a", "b"] }, "x".repeat(201), "summary"],
   ])("leaves out %s: %j", (key, spec, summary, why) => {
-    expect(declarationProblem(key, spec, summary)).toMatch(why);
     const { body, skipped } = experimentsDeclaredBody({ [key]: spec, ok: { variants: ["a", "b"] } }, { brandId: "aquafix", sourceId: "s", at: AT, ...(summary ? { summaries: { [key]: summary } } : {}) });
-    expect(body.events[0].properties.experiments.map(e => e.key)).toEqual(["ok"]);
-    expect(skipped).toEqual([{ key, why: expect.stringMatching(why) }]);
+    expect(body.events[0]?.properties).toEqual({ experiments: [{ key: "ok", variants: ["a", "b"], weights: [1, 1], enabled: true }] });
+    expect(skipped).toEqual([{ key, why }]);
   });
 });
 
@@ -92,7 +89,7 @@ describe("declareExperiments", () => {
     expect(JSON.parse(sent.body)).toMatchObject({ events: [{ type: "experiments.declared", source: { kind: "site", id: "aquafix-site" }, subject: { brandId: "aquafix" } }] });
     expect(sent.headers.get("x-sa-key-id")).toBe("aquafix-site");
     const ts = sent.headers.get("x-sa-timestamp") ?? "";
-    expect(sent.headers.get("x-sa-signature")).toBe(signWebhook("s3cret", SIGNING.prefix, ts, sent.body));
+    expect(sent.headers.get("x-sa-signature")).toBe(signWebhook("s3cret", SA_INGEST_SIGNING.prefix, ts, sent.body));
     expect(hook.outbox.rows()[0]?.ref).toMatch(/^experiments:/);
   });
 
@@ -119,11 +116,6 @@ describe("declareExperiments", () => {
     const broken = { declareExperiments: () => { throw new Error("disk full"); } } as unknown as LeadWebhook;
     expect(declareExperiments(() => broken, experiments, { log })).toEqual({ kind: "failed" });
     expect(log.error).toHaveBeenCalledTimes(2);
-  });
-
-  it("is off for a webhook that cannot declare (a brand's own double)", () => {
-    const double = { tick: vi.fn() } as unknown as LeadWebhook;
-    expect(declareExperiments(() => double, experiments)).toEqual({ kind: "off" });
   });
 
   it("does not throw when the first send fails: the outbox retries", async () => {

@@ -2,8 +2,7 @@ import { cn, Popover, PopoverContent, PopoverTrigger } from "@evinvest/uikit";
 import { useSyncExternalStore, type ReactNode } from "react";
 import { fillText, formatCents } from "../core/lead-capture-format";
 import type { LeadCaptureFlowText } from "../core/lead-capture-text";
-import type { LeadFlow } from "../core/pricing/flow";
-import type { Price, PriceLine, PricingModel } from "../core/pricing/model";
+import type { LeadFlow, Price, PriceLine, PricingModel } from "@evinvest/sites-contract";
 import { labelOf } from "../core/pricing/label";
 import type { PartClassNames } from "./parts";
 

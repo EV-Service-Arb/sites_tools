@@ -1,3 +1,5 @@
+import { LEAD_LIMITS, PLACE_LIMITS } from "@evinvest/sites-contract";
+
 /**
  * The messenger channels: WhatsApp, where the customer sends our prefilled
  * message, and Telegram, the brand's bot opened with a deep link. Either way
@@ -10,9 +12,9 @@ export const MESSAGE_REF_FIELD = "message_ref";
 
 /**
  * `<PREFIX>-<4..8 chars>` in Crockford base32 without I, L, O, U — read aloud
- * and typed back without a mix-up. The panel's own rule, the same regex.
+ * and typed back without a mix-up.
  */
-export const MESSAGE_REF = /^[A-Z]{2,4}-[0-9A-HJKMNP-TV-Z]{4,8}$/;
+export const MESSAGE_REF = /* @__PURE__ */ new RegExp(LEAD_LIMITS.messageRef);
 
 /** A brand's reference prefix (`AQ`, `VF`). */
 export const MESSAGE_REF_PREFIX = /^[A-Z]{2,4}$/;
@@ -43,11 +45,8 @@ export function messageRefOf(value: unknown): string | null {
   return MESSAGE_REF.test(ref) ? ref : null;
 }
 
-/**
- * A Telegram bot's username, without `@`: Telegram's own rule for a bot — 5
- * to 32 characters, a letter first, ending in `bot` — and the panel's.
- */
-export const TELEGRAM_BOT = /^[A-Za-z][A-Za-z0-9_]{1,28}[Bb][Oo][Tt]$/;
+/** A Telegram bot's username, without `@`: 5 to 32 characters, a letter first, ending in `bot`. */
+export const TELEGRAM_BOT = /* @__PURE__ */ new RegExp(PLACE_LIMITS.telegramBot);
 
 /**
  * The bot's deep link, `https://t.me/<bot>?start=<ref>`. The `start`

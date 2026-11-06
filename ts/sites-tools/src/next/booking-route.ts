@@ -1,5 +1,5 @@
 import { leadRef } from "../core/accept";
-import { bookingRequestProblems, parseBookingRequest } from "../core/booking/validate";
+import { bookingRequested, preferredDateInWindow } from "@evinvest/sites-contract";
 import type { LeadStore } from "../core/lead";
 import type { ServerEnv } from "../server/env";
 import { openLeadStore } from "../server/lead-store";
@@ -21,8 +21,8 @@ import type { LeadWebhook } from "../server/lead-webhook";
  * form's submission id. The id is what proves the post comes from the page
  * that sent the lead: it is a random UUID only that page knew, and the lead's
  * reference is derived from it — a guessed `lead_ref` alone books nothing.
- * Answers `200 { ok: true, queued }`; `queued` is `false` when the switch is
- * off (`panelBooking`) or the lead already asked.
+ * Answers `200 { ok: true, queued }`; `queued` is `false` when the webhook
+ * is off or the lead already asked.
  */
 export interface BookingRouteDeps {
   env: () => Pick<ServerEnv, "leadsDb">;
@@ -34,9 +34,6 @@ export interface BookingRouteDeps {
 }
 
 const MAX_BODY = 4 * 1024;
-const DAY_MS = 86_400_000;
-/** How far ahead a preferred day may be; a day already past (a day's slack for time zones) is refused. */
-const MAX_AHEAD_DAYS = 366;
 const SUBMISSION = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 function json(status: number, body: unknown): Response {
@@ -45,11 +42,6 @@ function json(status: number, body: unknown): Response {
 
 type Json = Record<string, unknown>;
 const isObject = (v: unknown): v is Json => typeof v === "object" && v !== null && !Array.isArray(v);
-
-function inWindow(day: string, now: number): boolean {
-  const at = Date.parse(`${day}T00:00:00Z`);
-  return at >= now - 2 * DAY_MS && at <= now + MAX_AHEAD_DAYS * DAY_MS;
-}
 
 /** The body as text, or `null` past `MAX_BODY` — counted as it arrives, since a chunked body has no length. */
 async function readCapped(request: Request): Promise<string | null> {
@@ -93,9 +85,10 @@ export function bookingRoute(deps: BookingRouteDeps): (request: Request) => Prom
     if (!isObject(body)) return json(400, { ok: false });
     const { submission, ...properties } = body;
     if (typeof submission !== "string" || !SUBMISSION.test(submission)) return json(422, { ok: false });
-    if (bookingRequestProblems(properties).length > 0) return json(422, { ok: false });
-    const booking = parseBookingRequest(properties);
-    if (booking.preferredDate !== undefined && !inWindow(booking.preferredDate, now())) return json(422, { ok: false });
+    const booking = bookingRequested(properties);
+    if (!booking) return json(422, { ok: false });
+    // The panel's own window, on the day the panel will see it arrive.
+    if (booking.preferred_date !== undefined && !preferredDateInWindow(booking.preferred_date, new Date(now()).toISOString().slice(0, 10))) return json(422, { ok: false });
 
     let found;
     try {
@@ -106,7 +99,7 @@ export function bookingRoute(deps: BookingRouteDeps): (request: Request) => Prom
       log.error("booking: the lead store could not be read", error);
       return json(503, { ok: false });
     }
-    if (!found || leadRef(found.id, submission) !== booking.leadRef) return json(404, { ok: false });
+    if (!found || leadRef(found.id, submission) !== booking.lead_ref) return json(404, { ok: false });
     // Booking follows a priced lead; a quote's slot is set on the call.
     if (found.lead.flow !== "estimate" && found.lead.flow !== "fixed") return json(409, { ok: false });
 
