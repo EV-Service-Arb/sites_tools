@@ -4,6 +4,19 @@
 Service-Arb's landing machinery: `@evinvest/kitstart` (the TypeScript a brand's
 Next site is built from), its pure Rust core, and `lib.mkLanding`, the flake
 every brand's `flake.nix` is one call to.
+<!-- markdownlint-disable -->
+<details>
+<summary>
+<h2>Installation</h2>
+</summary>
+
+A new brand starts from [`ts/kitstart/template/`](ts/kitstart/template/): copy
+it, `npm install`, and follow its README. Its `flake.nix` pins this repo at the
+`@evinvest/kitstart-vX.Y.Z` tag of the npm version it locks.
+
+
+</details>
+<!-- markdownlint-restore -->
 
 ## Usage
 ### Layout
