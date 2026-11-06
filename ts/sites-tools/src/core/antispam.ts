@@ -1,7 +1,10 @@
-import { MIN_FILL_MS, RATE_LIMIT_OVERFLOW_KEY } from "../generated/contract";
 import type { SpamVerdict } from "./lead";
 
-export { HONEYPOT_FIELD, LEGACY_HONEYPOT_FIELDS, MIN_FILL_MS, RATE_LIMIT_OVERFLOW_KEY, RENDERED_AT_FIELD } from "../generated/contract";
+export const HONEYPOT_FIELD = "hp_ref";
+export const LEGACY_HONEYPOT_FIELDS = ["website"] as const;
+export const RENDERED_AT_FIELD = "t";
+export const MIN_FILL_MS = 3000;
+export const RATE_LIMIT_OVERFLOW_KEY = "\0overflow";
 
 /**
  * Three cheap barriers, none of which needs the visitor to run a script — the

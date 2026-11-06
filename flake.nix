@@ -16,40 +16,11 @@
 
           pname = "sites_tools";
 
-          # `nix run .#gen`: the shared contract the TS port reads, from the Rust core.
-          gen = pkgs.writeShellApplication {
-            name = "gen";
-            runtimeInputs = [ rust pkgs.git ];
-            text = ''
-              cd "$(git rev-parse --show-toplevel)"
-              exec cargo run -q -p sites_tools_gen "$@"
-            '';
-          };
-
-          pre-commit-check = pre-commit-hooks.lib.${system}.run (
-            let base = v_flakes.files.preCommit { inherit pkgs; }; in
-            base // {
-              hooks = base.hooks // {
-                generated = {
-                  enable = true;
-                  name = "regenerate derived files";
-                  entry = "bash -c '${gen}/bin/gen && git add -A ts/sites-tools/src/generated'";
-                  pass_filenames = false;
-                  require_serial = true;
-                };
-              };
-            }
-          );
-
-          rs = v_flakes.rs {
-            inherit pkgs rust;
-            build.enable = false;
-          };
+          pre-commit-check = pre-commit-hooks.lib.${system}.run (v_flakes.files.preCommit { inherit pkgs; });
 
           github = v_flakes.github {
-            inherit pkgs pname rs;
+            inherit pkgs pname;
             enable = true;
-            lastSupportedVersion = "nightly-2026-05-12";
             gitignore.extra = ''
               ## Node / TypeScript
               **/node_modules
@@ -75,7 +46,7 @@
             badges = [ "msrv" ];
           };
 
-          combined = v_flakes.utils.combine { inherit rust; modules = [ rs github readme ]; };
+          combined = v_flakes.utils.combine { inherit rust; modules = [ github readme ]; };
 
           # `nix run .#publish -- <major|minor|patch>`: bump `@evinvest/sites-tools`,
           # move the template onto it, tag; the pushed tag is what CI publishes.
@@ -206,11 +177,10 @@
             type = "app";
             program = "${pkgs.writeShellScriptBin "help" ''
               cat <<'EOF'
-              ${pname} — Service-Arb landing machinery: @evinvest/sites-tools, its Rust core, lib.mkLanding
+              ${pname} — Service-Arb landing machinery: @evinvest/sites-tools, lib.mkLanding
 
               Commands:
-                nix develop                              dev shell (rust nightly, node, playwright, pre-commit)
-                nix run .#gen                            regenerate ts/sites-tools/src/generated from the Rust core
+                nix develop                              dev shell (node, playwright, pre-commit)
                 nix run .#publish -- <major|minor|patch> bump + tag @evinvest/sites-tools (CI publishes the tag)
                 nix run .#sites-tools-visual [-- --update]  visual regression of the sites-tools widget gallery
                 nix run .#mk-landing-smoke               smoke the mk-landing fixture container (linux + docker)
@@ -224,11 +194,6 @@
           apps.publish = {
             type = "app";
             program = "${publish}/bin/publish";
-          };
-
-          apps.gen = {
-            type = "app";
-            program = "${gen}/bin/gen";
           };
 
           apps.sites-tools-visual = {
@@ -267,22 +232,17 @@
                 + combined.shellHook
                 + ''
                   cp -f ${(v_flakes.files.treefmt) { inherit pkgs; }} ./.treefmt.toml
-                  export DYLD_FALLBACK_LIBRARY_PATH="${rust}/lib''${DYLD_FALLBACK_LIBRARY_PATH:+:$DYLD_FALLBACK_LIBRARY_PATH}"
                 '';
 
               packages = [
                 nodejs
-                rust
                 playwright-driver.browsers
                 playwright-test
               ]
-              ++ lib.optionals stdenv.isLinux [ mold ]
               ++ pre-commit-check.enabledPackages
               ++ combined.enabledPackages;
 
-              env = visual.env // {
-                RUST_BACKTRACE = 1;
-              };
+              env = visual.env;
             };
         }
       )

@@ -1,7 +1,6 @@
-import { RATING_MAX_AGE_DAYS } from "../../generated/contract";
 import type { Place, Rating } from "./types";
 
-export { RATING_MAX_AGE_DAYS } from "../../generated/contract";
+export const RATING_MAX_AGE_DAYS = 30;
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const DATE_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/;
@@ -10,7 +9,7 @@ const DATE_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\
  * An instant from the live source: RFC 3339 with an offset or `Z`, or a bare
  * date (midnight UTC). A date-time without an offset is refused — `Date.parse`
  * would read it in the server's own zone, so one timestamp would mean two
- * instants on two pods (and in the Rust port). `null` for anything else.
+ * instants on two pods. `null` for anything else.
  */
 export function parseInstant(value: string): number | null {
   if (!DATE.test(value) && !DATE_TIME.test(value)) return null;

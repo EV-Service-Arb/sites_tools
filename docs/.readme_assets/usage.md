@@ -4,8 +4,6 @@
 | ---- | ---- |
 | [`ts/sites-tools/`](ts/sites-tools/) | `@evinvest/sites-tools` on npm; its README is the manual |
 | [`ts/sites-tools/template/`](ts/sites-tools/template/) | the brand scaffold the package ships |
-| [`rust/`](rust/) | crate `kitstart`: the pure core, pinned to the TS port by `tests/fixtures/kitstart/` |
-| [`gen/`](gen/) | `nix run .#gen`: the TS contract, from the Rust core |
 | [`nix/`](nix/) | `lib.mkLanding` |
 
 See [ARCHITECTURE.md](docs/ARCHITECTURE.md).

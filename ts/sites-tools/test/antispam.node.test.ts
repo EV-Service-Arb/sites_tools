@@ -17,7 +17,7 @@ interface Case {
   steps: Step[];
 }
 
-// Shared with the Rust port: one limiter per case, the steps in order.
+// One limiter per case, the steps in order.
 describe("antispam against the shared fixtures", () => {
   const { cases } = fixture<{ cases: Case[] }>("antispam.json");
   it.each(cases.map(c => [c.name, c] as const))("%s", (_, c) => {

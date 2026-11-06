@@ -1226,9 +1226,8 @@ admit. `npm run check:template` installs them from the registry, so a range
 that no longer meets sites-tools' peers fails there. Bump the sites_tools
 revision a brand pins (`mkLanding`) in the same PR as its npm version.
 
-## Shared fixtures with Rust
+## Site fixtures
 
-`tests/fixtures/kitstart/` at the repo root holds the site configs, routing
-decisions and the JSON-LD / metadata / sitemap goldens (aquafix's, verbatim).
-This package's tests and the Rust `kitstart` crate (`rust/`) both run them; a change to
-a builder's output is a change to those files, visible in review.
+`test/fixtures/site/` holds the site configs, routing decisions and the
+JSON-LD / metadata / sitemap goldens (aquafix's, verbatim); a change to a
+builder's output is a change to those files, visible in review.

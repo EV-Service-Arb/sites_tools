@@ -1,11 +1,9 @@
-import { GONE, HOST_MARK, NON_PAGE_ROUTES, THANKS } from "../generated/contract";
 import type { LinkMode } from "./place/view";
 import type { Site } from "./site";
 
 /**
  * Which place and which language a request gets, decided before any route
- * renders. Pure, so it is tested without a server — and mirrored by the Rust
- * `kitstart` feature against `tests/fixtures/kitstart/decide.json`.
+ * renders. Pure, so it is tested without a server.
  *
  * ```text
  * <slug>.<domain>/fr/prices      → /fr/_<slug>/prices   (host link mode)
@@ -34,7 +32,13 @@ import type { Site } from "./site";
  * `/sitemap.xml`, `/og` and the brand's files pass straight through.
  */
 
-export { GONE, GONE_HEADER, HOST_MARK, LANG_COOKIE, LANG_COOKIE_MAX_AGE, NON_PAGE_ROUTES, THANKS } from "../generated/contract";
+export const THANKS = "/thanks";
+export const LANG_COOKIE = "lang";
+export const LANG_COOKIE_MAX_AGE = 31536000;
+export const HOST_MARK = "_";
+export const GONE = "404";
+export const GONE_HEADER = "x-landing-not-found";
+export const NON_PAGE_ROUTES = ["/quote", "/quote/booking", "/quote/confirm", "/og", "/health", "/.well-known/sa-site", "/sitemap.xml", "/robots.txt"] as const;
 
 /**
  * The path no route matches, in a language.

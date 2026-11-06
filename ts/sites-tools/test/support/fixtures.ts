@@ -11,11 +11,8 @@ import {
   type Site,
 } from "../../src/index";
 
-/**
- * The fixtures the TS and Rust ports share, at the lib root. A site there is
- * data only; this turns one into a `Site` the way a brand's `site.ts` would.
- */
-const ROOT = join(import.meta.dirname, "../../../../tests/fixtures/kitstart");
+/** A site in `fixtures/site/` is data only; this turns one into a `Site` the way a brand's `site.ts` would. */
+const ROOT = join(import.meta.dirname, "../fixtures/site");
 
 export function fixture<T = unknown>(name: string): T {
   return JSON.parse(readFileSync(join(ROOT, name), "utf8")) as T;

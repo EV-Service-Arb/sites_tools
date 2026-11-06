@@ -2,7 +2,7 @@
 ![Minimum Supported Rust Version](https://img.shields.io/badge/nightly-1.92+-ab6000.svg)
 
 Service-Arb's landing machinery: `@evinvest/sites-tools` (the TypeScript a brand's
-Next site is built from), its pure Rust core, and `lib.mkLanding`, the flake
+Next site is built from) and `lib.mkLanding`, the flake
 every brand's `flake.nix` is one call to.
 <!-- markdownlint-disable -->
 <details>
@@ -25,8 +25,6 @@ it, `npm install`, and follow its README. Its `flake.nix` pins this repo at the
 | ---- | ---- |
 | [`ts/sites-tools/`](ts/sites-tools/) | `@evinvest/sites-tools` on npm; its README is the manual |
 | [`ts/sites-tools/template/`](ts/sites-tools/template/) | the brand scaffold the package ships |
-| [`rust/`](rust/) | crate `kitstart`: the pure core, pinned to the TS port by `tests/fixtures/kitstart/` |
-| [`gen/`](gen/) | `nix run .#gen`: the TS contract, from the Rust core |
 | [`nix/`](nix/) | `lib.mkLanding` |
 
 See [ARCHITECTURE.md](docs/ARCHITECTURE.md).

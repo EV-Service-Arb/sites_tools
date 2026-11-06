@@ -8,8 +8,7 @@ import { contactOf, type Site } from "../site";
  * schema.org, derived from the site, the place and the page's copy — never
  * authored. One `@graph` per page with shared `@id`s, so Google collapses the
  * entities instead of reading each as separate. Output is pinned against
- * aquafix's goldens in `tests/fixtures/kitstart/json-ld.json`, which the Rust
- * `kitstart` feature reads too.
+ * aquafix's goldens in `test/fixtures/site/json-ld.json`.
  *
  * A storefront carries its address, pin and photo; a service-area business
  * has none of the three in its type, so its node says where it goes

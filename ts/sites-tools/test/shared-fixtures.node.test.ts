@@ -14,10 +14,9 @@ import {
 import { fixture, fixtureSite } from "./support/fixtures";
 
 /**
- * The fixtures in `tests/fixtures/kitstart/` pin what a crawler reads — the
- * expected values are aquafix's goldens verbatim — and the Rust `kitstart`
- * feature runs the same files. Compared as serialised text, so key order is
- * pinned too: the goldens are byte-for-byte.
+ * The fixtures in `fixtures/site/` pin what a crawler reads — the expected
+ * values are aquafix's goldens verbatim. Compared as serialised text, so key
+ * order is pinned too: the goldens are byte-for-byte.
  */
 const text = (value: unknown): string => JSON.stringify(value, null, 2);
 

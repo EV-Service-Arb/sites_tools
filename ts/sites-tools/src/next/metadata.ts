@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { isPublished } from "../core/place/publication";
-import { OG_IMAGE_SIZE } from "../generated/contract";
 import { placeOrigin, siteOrigin, type PlaceView } from "../core/place/view";
 import { ogImageUrl } from "../core/seo/sitemap";
 import { ogLocaleOf, type Site } from "../core/site";
@@ -8,8 +7,8 @@ import { ogLocaleOf, type Site } from "../core/site";
 /**
  * `<head>` for the three kinds of page. Every string comes from the copy — the
  * description here is the same field the OG card and the JSON-LD read. Output
- * pinned in `tests/fixtures/kitstart/metadata.json` (aquafix's goldens, and
- * the service-area and pre-launch sites).
+ * pinned in `test/fixtures/site/metadata.json` (aquafix's goldens, and the
+ * service-area and pre-launch sites).
  *
  * Each language version is its own indexable URL, self-canonical, naming the
  * whole cluster in `hreflang` with `x-default` on the default locale. The
@@ -26,6 +25,8 @@ export interface PageMeta {
   title: string;
   description: string;
 }
+
+export const OG_IMAGE_SIZE = [1200, 630] as const;
 
 const PRE_LAUNCH = { index: false, follow: false } as const;
 

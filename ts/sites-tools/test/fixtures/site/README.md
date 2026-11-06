@@ -1,8 +1,8 @@
-# kitstart shared fixtures
+# Site fixtures
 
-Test vectors for the landing machinery, read by both ports: `ts/kitstart`
-(vitest) and the Rust `kitstart` feature. Data only — no code here.
-Compare serialised output: key order is part of the contract.
+Test vectors for the landing machinery, read by this package's vitest suite
+(`test/shared-fixtures.node.test.ts`, `test/antispam.node.test.ts`). Data only.
+Output is compared serialised: key order is pinned too.
 
 | File | Case shape | Expected |
 |---|---|---|

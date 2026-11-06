@@ -1,11 +1,10 @@
-import { AI_CRAWLERS } from "../../generated/contract";
 import { isPublished } from "../place/publication";
 import type { Place } from "../place/types";
 import { placeOrigin, siteOrigin } from "../place/view";
 import { createRouting } from "../routing";
 import type { Site } from "../site";
 
-export { AI_CRAWLERS } from "../../generated/contract";
+export const AI_CRAWLERS = ["GPTBot", "ClaudeBot", "PerplexityBot", "Google-Extended"] as const;
 
 /**
  * One sitemap per host: a sitemap may only list URLs on its own host, and a

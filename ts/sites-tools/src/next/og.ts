@@ -1,9 +1,9 @@
 import { ImageResponse } from "next/og.js";
 import type { ReactElement } from "react";
 import { memoByKey } from "../core/memo";
-import { OG_IMAGE_SIZE } from "../generated/contract";
 import type { Place } from "../core/place/types";
 import { bakedPlace, type Site } from "../core/site";
+import { OG_IMAGE_SIZE } from "./metadata";
 
 /**
  * `app/og/route.tsx`: the OG card, drawn by the brand from the same fields the
