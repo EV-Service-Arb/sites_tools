@@ -1,0 +1,16 @@
+[package]
+name = "sites_tools_gen"
+version = "0.1.0"
+edition = "2024"
+description = "Generates `ts/kitstart/src/generated/` from the Rust core."
+license = "BlueOak-1.0.0"
+repository = "https://github.com/EV-Service-Arb/sites_tools"
+publish = false
+
+[dependencies]
+ev_lib = { workspace = true, features = ["ts_gen"] }
+kitstart.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

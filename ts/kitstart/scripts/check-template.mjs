@@ -1,5 +1,5 @@
-// Builds `template/` as a brand would — against the packed tarballs of this
-// package and the workspace kit and marketing layer — and holds the result to
+// Builds `template/` as a brand would — against this package's packed tarball,
+// everything else from the registry — and holds the result to
 // the contract a landing ships with: types, the brand's tests, `next build`,
 // the bundle budget, and a live standalone server answering the routes.
 //
@@ -7,14 +7,12 @@
 // shows that the pieces meet Next where it is strict: segment config read
 // statically, client boundaries, `server-only`, the proxy on the edge.
 //
-//   node scripts/check-template.mjs [--keep] [--e2e] [--pre-publish | --registry]
+//   node scripts/check-template.mjs [--keep] [--e2e] [--registry]
 //
-// Default: the packed tarballs must satisfy the template's own ranges and
-// kitstart's peers, exactly as a brand's install would demand, and npm installs
-// with --strict-peer-deps (so does --registry).
-// --pre-publish: before the first release the workspace packages carry their
-//   old version numbers; the range checks are skipped (loudly) and npm is
-//   told to ignore peers. Never the mode for a release.
+// Default: the packed tarball must satisfy the template's own range, exactly as
+// a brand's install would demand, and npm installs with --strict-peer-deps (so
+// does --registry), which holds the registry's kit and marketing layer to
+// kitstart's peers.
 // --e2e: then the template's own Playwright suites for the lead form
 //   (`tests/e2e/quote-form.spec.ts`, `flows.spec.ts`, `steps.spec.ts`) and the QA
 //   menu (`ab-switcher.spec.ts`: its panel fetched by a test visit only) against the standalone
@@ -38,24 +36,10 @@ import { join, resolve } from "node:path";
 import { satisfies } from "./semver.mjs";
 
 const kitstart = resolve(import.meta.dirname, "..");
-const workspace = resolve(kitstart, "..");
 const keep = process.argv.includes("--keep");
-const prePublish = process.argv.includes("--pre-publish");
 const registry = process.argv.includes("--registry");
 const e2e = process.argv.includes("--e2e");
 
-/** Every range the install will hold the packed versions to. */
-function checkRanges(manifest, packed) {
-  const kit = JSON.parse(readFileSync(join(kitstart, "package.json"), "utf8"));
-  const problems = [];
-  for (const [name, version] of Object.entries(packed)) {
-    const wanted = manifest.dependencies[name];
-    if (wanted && !satisfies(version, wanted)) problems.push(`template wants ${name}@${wanted}, packed ${version}`);
-    const peer = kit.peerDependencies[name];
-    if (peer && name !== "@evinvest/kitstart" && !satisfies(version, peer)) problems.push(`kitstart's peer ${name}@${peer}, packed ${version}`);
-  }
-  if (problems.length > 0) throw new Error(`the packed versions would not install as a brand's would:\n  ${problems.join("\n  ")}`);
-}
 const dir = mkdtempSync(join(tmpdir(), "kitstart-template-"));
 const packs = join(dir, ".packs");
 
@@ -65,8 +49,8 @@ const run = (cmd, args, cwd = dir, env = {}) => {
 };
 
 /** `npm pack` into `.packs/`, answering the tarball's path and version. */
-function pack(pkg) {
-  const out = execFileSync("npm", ["pack", "--json", "--pack-destination", packs], { cwd: join(workspace, pkg), encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] });
+function pack() {
+  const out = execFileSync("npm", ["pack", "--json", "--pack-destination", packs], { cwd: kitstart, encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] });
   // npm <= 11 reports an array of packages, npm >= 12 an object keyed by package name.
   const report = JSON.parse(out.slice(Math.max(out.lastIndexOf("\n["), out.lastIndexOf("\n{")) + 1));
   const [packed] = Array.isArray(report) ? report : Object.values(report);
@@ -187,20 +171,14 @@ try {
   cpSync(join(kitstart, "template"), dir, { recursive: true });
   // Strict peers: a peer range that no longer meets the kit or Next fails the
   // install here, not as a warning a brand scrolls past.
-  const install = ["install", "--no-audit", "--no-fund", ...(prePublish ? [] : ["--strict-peer-deps"])];
+  const install = ["install", "--no-audit", "--no-fund", "--strict-peer-deps"];
   if (!registry) {
     mkdirSync(packs);
-    const tarballs = { "@evinvest/uikit": pack("uikit"), "@evinvest/marketing": pack("marketing"), "@evinvest/kitstart": pack("kitstart") };
+    const packed = pack();
     const manifest = JSON.parse(readFileSync(join(dir, "package.json"), "utf8"));
-    const versions = Object.fromEntries(Object.entries(tarballs).map(([n, t]) => [n, t.version]));
-    if (prePublish) {
-      console.warn("\n!!! --pre-publish: packed versions are NOT checked against the template's ranges or kitstart's peers,");
-      console.warn(`!!! and npm ignores peers. Packed: ${JSON.stringify(versions)}. Never release on this run.\n`);
-      install.push("--legacy-peer-deps");
-    } else {
-      checkRanges(manifest, versions);
-    }
-    for (const [name, t] of Object.entries(tarballs)) manifest.dependencies[name] = `file:${t.file}`;
+    const wanted = manifest.dependencies["@evinvest/kitstart"];
+    if (!satisfies(packed.version, wanted)) throw new Error(`template wants @evinvest/kitstart@${wanted}, packed ${packed.version}`);
+    manifest.dependencies["@evinvest/kitstart"] = `file:${packed.file}`;
     writeFileSync(join(dir, "package.json"), `${JSON.stringify(manifest, null, 2)}\n`);
   }
   run("npm", install);

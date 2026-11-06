@@ -8,7 +8,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/EV-Main/lib.git",
+    "url": "git+https://github.com/EV-Service-Arb/sites_tools.git",
     "directory": "ts/kitstart"
   },
   "type": "module",
@@ -104,8 +104,8 @@
   "devDependencies": {
     "@evinvest/analytics": "^0.3.0",
     "@evinvest/i18n": "^0.9.0",
-    "@evinvest/marketing": "file:../marketing",
-    "@evinvest/uikit": "file:../uikit",
+    "@evinvest/marketing": "^0.4.0",
+    "@evinvest/uikit": "^0.31.0",
     "@playwright/test": "^1.63.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.3",

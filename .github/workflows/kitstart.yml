@@ -7,10 +7,9 @@ name: kitstart
   pull_request:
     paths:
       - ts/kitstart/**
-      - rust/src/kitstart/**
-      - rust/src/i18n/**
-      - ts/uikit/**
-      - ts/marketing/**
+      - rust/**
+      - gen/**
+      - Cargo.*
       - tests/fixtures/kitstart/**
       - .github/workflows/kitstart.yml
       - flake.nix
@@ -20,10 +19,9 @@ name: kitstart
     branches: [main]
     paths:
       - ts/kitstart/**
-      - rust/src/kitstart/**
-      - rust/src/i18n/**
-      - ts/uikit/**
-      - ts/marketing/**
+      - rust/**
+      - gen/**
+      - Cargo.*
       - tests/fixtures/kitstart/**
       - .github/workflows/kitstart.yml
       - flake.nix
@@ -48,17 +46,7 @@ jobs:
           # `node:sqlite` without a flag needs >= 22.13 (the lead store).
           node-version: '22.14'
           cache: npm
-          cache-dependency-path: |
-            ts/kitstart/package-lock.json
-            ts/uikit/package-lock.json
-            ts/marketing/package-lock.json
-      # The workspace packages kitstart develops against (`file:` devDependencies):
-      # built here, because a linked directory ships whatever `dist/` it has.
-      - name: Build the workspace packages it links
-        run: |
-          for pkg in uikit marketing; do
-            (cd "../$pkg" && npm ci --ignore-scripts && npm run build)
-          done
+          cache-dependency-path: ts/kitstart/package-lock.json
       - name: Install
         run: npm ci
       - name: Typecheck
@@ -72,7 +60,7 @@ jobs:
       - name: Verify the tarball
         run: node scripts/verify-pack.mjs
 
-  # `template/` built as a brand would — against the packed tarballs — through
+  # `template/` built as a brand would — against the packed tarball — through
   # `next build`, its own tests, the bundle budget, a live standalone server
   # and its quote-form e2e: the only place the factories meet a real Next build.
   template:
@@ -89,23 +77,15 @@ jobs:
         with:
           node-version: '22.14'
           cache: npm
-          cache-dependency-path: |
-            ts/kitstart/package-lock.json
-            ts/uikit/package-lock.json
-            ts/marketing/package-lock.json
-      - name: Build the workspace packages it links and packs
-        run: |
-          for pkg in uikit marketing; do
-            (cd "../$pkg" && npm ci --ignore-scripts && npm run build)
-          done
+          cache-dependency-path: ts/kitstart/package-lock.json
       - name: Install
         run: npm ci
       # The runner is kitstart's own `@playwright/test`; its browser matches it.
       - name: Install the e2e browser
         run: npx playwright install --with-deps chromium
       - name: Build, smoke and e2e the template
-        # The packed workspace versions must meet the template's ranges and
-        # kitstart's peers, strictly; `kitstart-registry.yml` covers the
+        # The packed version must meet the template's range, and the
+        # registry's kit kitstart's peers, strictly; `kitstart-registry.yml` covers the
         # published set. `--e2e`: the quote form without and with JavaScript.
         run: npm run check:template -- --e2e
 
@@ -130,32 +110,26 @@ jobs:
       - name: Boot the image and hold it to the container contract
         run: nix run .#mk-landing-smoke
 
-  # The Rust port of the core (`kitstart` feature) against the same fixtures.
-  # Skipped until the feature is in the tree (EV-invest/lib#149).
+  # The Rust port of the core (`rust/`) against the same fixtures, and the
+  # generated contract against it.
   rust:
-    name: rust kitstart (fixtures, clippy, wasm32)
+    name: rust kitstart (fixtures, clippy, wasm32, gen)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      - name: Is the Rust port here?
-        id: port
-        run: |
-          if [ -d rust/src/kitstart ]; then echo "present=true" >> "$GITHUB_OUTPUT"; else echo "present=false" >> "$GITHUB_OUTPUT"; fi
       - name: Install Nix
-        if: steps.port.outputs.present == 'true'
         uses: DeterminateSystems/nix-installer-action@main
         with:
           extra-conf: 'lazy-trees = true'
       - name: Fixtures
-        if: steps.port.outputs.present == 'true'
-        run: nix develop --command env RUSTC_WRAPPER= cargo test -p ev_lib --features kitstart kitstart
+        run: nix develop --command env RUSTC_WRAPPER= cargo test --workspace
       - name: Clippy
-        if: steps.port.outputs.present == 'true'
-        run: nix develop --command env RUSTC_WRAPPER= cargo clippy -p ev_lib --features kitstart --all-targets -- -D warnings
+        run: nix develop --command env RUSTC_WRAPPER= cargo clippy --workspace --all-targets -- -D warnings
       - name: wasm32
-        if: steps.port.outputs.present == 'true'
-        run: nix develop --command env RUSTC_WRAPPER= cargo check -p ev_lib --target wasm32-unknown-unknown --no-default-features --features kitstart
+        run: nix develop --command env RUSTC_WRAPPER= cargo check -p kitstart --target wasm32-unknown-unknown
+      - name: Generated contract is current
+        run: nix run .#gen && git diff --exit-code -- ts/kitstart/src/generated
 
   # Renders the widget gallery on the pinned linux stack, publishes the PNGs as
   # the `kitstart-visual` artifact (the only honest source of baselines — a mac

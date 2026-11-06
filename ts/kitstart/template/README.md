@@ -8,7 +8,7 @@ launch — `noindex` everywhere until `assets/card.toml` gets a `site`.
 ## Twelve steps
 
 1. Copy this directory into the new repo; `npm install`.
-2. `flake.nix` calls the lib flake's `mkLanding` (the build, the image, the
+2. `flake.nix` calls sites_tools' `mkLanding` (the build, the image, the
    smoke, the bundle-budget check); `nix develop`.
 3. `assets/brand.toml` → `npm run palette` (writes `app/brand.css`; the OG card
    takes `[colors.dark]` from the same file at build).

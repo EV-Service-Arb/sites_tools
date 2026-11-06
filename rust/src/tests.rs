@@ -15,7 +15,7 @@ use super::{
 	PostalAddress, Presence, PublicationField, QuestionAnswer, RateLimiter, Rating, RequestFacts, SERVICE_AREA_GATE, STOREFRONT_GATE, ServiceArea, Site, SiteConfig, SpamVerdict, Storefront,
 	Submission, Topology, brand_meta, decide, place_graph, place_meta, robots_for, screen, sitemap_for, sitemap_json, status_meta,
 };
-use crate::i18n::{LocaleRegistry, LocaleRegistryConfig};
+use ev_lib::i18n::{LocaleRegistry, LocaleRegistryConfig};
 
 // ── reading the fixtures ─────────────────────────────────────────────────────
 

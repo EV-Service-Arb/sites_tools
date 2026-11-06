@@ -3,7 +3,7 @@
 # image, the bundle-budget check, the container smoke, the dev/test apps and
 # the dev shell. A brand's flake.nix (see ts/kitstart/template/flake.nix):
 #
-#   landing = ev.lib.mkLanding {
+#   landing = sites_tools.lib.mkLanding {
 #     inherit pkgs v_flakes;
 #     root = ./.;
 #     pname = "vifnet"; sitePort = "59082"; connected = true;
@@ -16,7 +16,7 @@
 #   packages = landing.packages; checks = landing.checks;
 #   apps = landing.apps; devShells.default = landing.devShell;
 #
-# The npm version of @evinvest/kitstart and the lib flake revision move
+# The npm version of @evinvest/kitstart and the sites_tools revision move
 # together: pin the flake to the tag `@evinvest/kitstart-vX.Y.Z` of the version
 # in package-lock.json (checked below), with `inputs.v_flakes.follows`.
 { pkgs
@@ -50,7 +50,7 @@
   smoke ? { page = "/fr"; }
 , # The flake attribute of the image the smoke boots.
   containerAttr ? ".#container"
-, # Refuse a lockfile whose @evinvest/kitstart is not this lib revision's.
+, # Refuse a lockfile whose @evinvest/kitstart is not this sites_tools revision's.
   # Off only for a flake that builds no kitstart landing.
   checkKitstartVersion ? true
 , # Playwright's config for `apps.test` / `apps.accept-test`.
@@ -76,11 +76,11 @@ let
   npmLock = lib.importJSON (root + "/package-lock.json");
 
   # ── the npm version ↔ this flake revision ──────────────────────────────
-  libKitstart = (lib.importJSON ../ts/kitstart/package.json).version;
+  ownKitstart = (lib.importJSON ../ts/kitstart/package.json).version;
   lockedKitstart = npmLock.packages."node_modules/@evinvest/kitstart".version or null;
   versionOk =
-    lib.assertMsg (!checkKitstartVersion || lockedKitstart == libKitstart)
-      "mkLanding: package-lock.json has @evinvest/kitstart ${toString lockedKitstart}, this lib flake revision is ${libKitstart} — pin the flake to the tag @evinvest/kitstart-v${toString lockedKitstart}";
+    lib.assertMsg (!checkKitstartVersion || lockedKitstart == ownKitstart)
+      "mkLanding: package-lock.json has @evinvest/kitstart ${toString lockedKitstart}, this sites_tools revision is ${ownKitstart} — pin the flake to the tag @evinvest/kitstart-v${toString lockedKitstart}";
 
   # ── addresses: derived by devops, never typed ──────────────────────────
   consumes = lib.optionalAttrs connected {
@@ -159,7 +159,7 @@ let
   # ── the one hard gate ──────────────────────────────────────────────────
   # First-load JS of a place page against the brand's committed budget, on
   # the hermetic build: `nix flake check` warns over the target and fails past
-  # its tolerance (kitstart's README, "The bundle budget"). The lib's own
+  # its tolerance (kitstart's README, "The bundle budget"). This revision's own
   # copy of `kitstart-size`, run from source with type stripping.
   sizeCli = ../ts/kitstart/src/cli;
   sizeCmd = root: ''node --experimental-strip-types --disable-warning=ExperimentalWarning ${sizeCli}/kitstart-size.ts ${root} --route ${lib.escapeShellArg gatedRoute} --budget ${lib.escapeShellArg budgetFile}'';

@@ -1,11 +1,11 @@
-//! `kitstart` — the pure core of a small-business landing (mirrors the core of
+//! The pure core of a small-business landing (mirrors the core of
 //! `@evinvest/kitstart`).
 //!
 //! What a crawler and a router read, and nothing that renders: the place model
 //! (a storefront with an address, or a service area with none), the
 //! publication gate, request routing and locale negotiation, schema.org
 //! JSON-LD, the `<head>` metadata, the sitemap and `robots.txt`, the quote
-//! form's spam barriers, and `tel:` / `wa.me` links. No I/O, no clock — the
+//! form's spam barriers. No I/O, no clock — the
 //! caller passes `now` — and `wasm32`-safe, so an edge router, a server and a
 //! Dioxus page share one implementation.
 //!
@@ -14,10 +14,8 @@
 //! why the builders emit this module's ordered [`Json`] rather than a map.
 //!
 //! ```
-//! use ev_lib::{
-//!     i18n::{LocaleRegistry, LocaleRegistryConfig},
-//!     kitstart::{BrandFacts, Channels, Decision, Place, Presence, RequestFacts, SERVICE_AREA_GATE, Site, SiteConfig, Topology, decide},
-//! };
+//! use ev_lib::i18n::{LocaleRegistry, LocaleRegistryConfig};
+//! use kitstart::{BrandFacts, Channels, Decision, Place, Presence, RequestFacts, SERVICE_AREA_GATE, Site, SiteConfig, Topology, decide};
 //!
 //! let site = Site::try_new(SiteConfig {
 //!     brand: BrandFacts {
@@ -61,7 +59,6 @@
 //! ```
 
 mod antispam;
-mod contact;
 mod json;
 mod ld;
 mod meta;
@@ -74,7 +71,6 @@ mod sitemap;
 mod tests;
 
 pub use antispam::{HONEYPOT_FIELD, LEGACY_HONEYPOT_FIELDS, MIN_FILL_MS, RATE_LIMIT_OVERFLOW_KEY, RENDERED_AT_FIELD, RateLimiter, SpamVerdict, Submission, check_timing, screen};
-pub use contact::{ContactChannel, contact_channel, tel_href, whatsapp_href};
 pub use json::{Json, Object};
 pub use ld::{
 	OfferInput, PageGraphCopy, QuestionAnswer, area_served_nodes, breadcrumb_node, business_id, business_node, faq_page_node, offer_nodes, organization_id, organization_node, place_graph,

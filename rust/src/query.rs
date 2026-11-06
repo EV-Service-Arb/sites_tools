@@ -1,7 +1,6 @@
-//! The two URL encodings the TypeScript port gets from the platform:
-//! `URLSearchParams` (application/x-www-form-urlencoded, WHATWG) and
-//! `encodeURIComponent`. Both are spelled out here so a redirect's query and an
-//! OG card's URL come out byte-identical in both ports.
+//! `URLSearchParams` (application/x-www-form-urlencoded, WHATWG), which the
+//! TypeScript port gets from the platform, spelled out so a redirect's query
+//! comes out byte-identical in both ports.
 
 /// A query string as `URLSearchParams` reads it: ordered pairs, `+` as space,
 /// percent-escapes decoded (invalid UTF-8 replaced, a malformed escape kept).
@@ -75,7 +74,7 @@ fn form_decode(s: &str) -> String {
 }
 
 /// Percent-escapes decoded; invalid UTF-8 replaced, a malformed escape kept.
-pub(crate) fn percent_decode(s: &str) -> String {
+fn percent_decode(s: &str) -> String {
 	let bytes = s.as_bytes();
 	let mut out = Vec::with_capacity(bytes.len());
 	let mut i = 0;
@@ -99,19 +98,6 @@ fn hex(byte: &u8) -> Option<u8> {
 	char::from(*byte).to_digit(16).and_then(|d| u8::try_from(d).ok())
 }
 
-/// `encodeURIComponent`: everything but `A–Z a–z 0–9 - _ . ! ~ * ' ( )`
-/// percent-encoded as UTF-8.
-pub(crate) fn encode_uri_component(s: &str) -> String {
-	let mut out = String::with_capacity(s.len());
-	for byte in s.bytes() {
-		match byte {
-			b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'!' | b'~' | b'*' | b'\'' | b'(' | b')' => out.push(char::from(byte)),
-			_ => push_escape(&mut out, byte),
-		}
-	}
-	out
-}
-
 fn push_escape(out: &mut String, byte: u8) {
 	const HEX: &[u8; 16] = b"0123456789ABCDEF";
 	out.push('%');
@@ -121,7 +107,7 @@ fn push_escape(out: &mut String, byte: u8) {
 
 #[cfg(test)]
 mod tests {
-	use super::{Query, encode_uri_component};
+	use super::Query;
 
 	#[test]
 	fn reads_and_writes_a_query_as_url_search_params_does() {
@@ -133,14 +119,5 @@ mod tests {
 		assert_eq!(query.to_string(), "utm_source=gbp&q=a+b+c&bad=%25zz");
 		assert!(Query::parse("").is_empty());
 		assert_eq!(Query::parse("é=ü~").to_string(), "%C3%A9=%C3%BC%7E");
-	}
-
-	#[test]
-	fn encodes_a_component_as_encode_uri_component_does() {
-		assert_eq!(
-			encode_uri_component("Bonjour, j'ai une fuite (urgent) ~ 100%"),
-			"Bonjour%2C%20j'ai%20une%20fuite%20(urgent)%20~%20100%25"
-		);
-		assert_eq!(encode_uri_component("café"), "caf%C3%A9");
 	}
 }

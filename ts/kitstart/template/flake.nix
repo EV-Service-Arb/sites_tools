@@ -1,19 +1,19 @@
 {
   inputs = {
     v_flakes.url = "github:valeratrades/v_flakes?ref=v1.6";
-    # The lib flake at the tag of the @evinvest/kitstart version in
+    # sites_tools at the tag of the @evinvest/kitstart version in
     # package-lock.json — mkLanding refuses a mismatch.
-    ev.url = "github:EV-Main/lib?ref=@evinvest/kitstart-v0.25.0";
-    ev.inputs.v_flakes.follows = "v_flakes";
+    sites_tools.url = "github:EV-Service-Arb/sites_tools?ref=@evinvest/kitstart-v0.25.0";
+    sites_tools.inputs.v_flakes.follows = "v_flakes";
   };
 
-  outputs = { self, v_flakes, ev }:
+  outputs = { self, v_flakes, sites_tools }:
     v_flakes.flake-utils.lib.eachDefaultSystem (
       system:
       let
         pkgs = import v_flakes.default_nixpkgs { inherit system; };
         sitePort = "59082";
-        landing = ev.lib.mkLanding {
+        landing = sites_tools.lib.mkLanding {
           inherit pkgs v_flakes sitePort;
           root = ./.;
           pname = "brand-landing";

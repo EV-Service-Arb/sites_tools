@@ -1,0 +1,16 @@
+[workspace]
+resolver = "3"
+members = ["rust", "gen"]
+
+[workspace.dependencies]
+ev_lib = "0.30"
+jiff = "0.2"
+kitstart = { path = "rust" }
+serde_json = "1"
+
+[workspace.lints.cargo]
+non_kebab_case_bins = "allow"
+
+[workspace.lints.rust]
+stable_features = "allow"
+unused_features = "allow"

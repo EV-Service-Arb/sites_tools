@@ -40,15 +40,15 @@ OG card and robots (`npm run check:template`).
 
 ## Nix: `lib.mkLanding`
 
-The lib flake exports the flake a landing shares (`nix/mk-landing.nix`), so a
+sites_tools exports the flake a landing shares (`nix/mk-landing.nix`), so a
 brand's `flake.nix` is its own config plus one call — `template/flake.nix` is
 the whole of one:
 
 ```nix
-inputs.ev.url = "github:EV-invest/lib?ref=@evinvest/kitstart-v0.25.0"; # the version in package-lock.json
-inputs.ev.inputs.v_flakes.follows = "v_flakes";
+inputs.sites_tools.url = "github:EV-Service-Arb/sites_tools?ref=@evinvest/kitstart-v0.25.0"; # the version in package-lock.json
+inputs.sites_tools.inputs.v_flakes.follows = "v_flakes";
 
-landing = ev.lib.mkLanding {
+landing = sites_tools.lib.mkLanding {
   pkgs, root, pname, sitePort, buildFiles,        # required
   connected,                                      # required: reads sites_panel, posts leads to the conductor
   prodEnv ? { },                                  # baked into the image (deploy/config.nix)
@@ -129,8 +129,8 @@ tolerance is a deliberate commit, with a reason, as raising the budget was.
   `LEADS_DB_URL`) blanked, wanting 500 from the store's refusal alone.
 
 **Versions move together.** mkLanding refuses a lock whose
-`@evinvest/kitstart` differs from the lib revision's
-`ts/kitstart/package.json`: the size gate runs the lib's copy of the bin, and
+`@evinvest/kitstart` differs from the sites_tools revision's
+`ts/kitstart/package.json`: the size gate runs that revision's copy of the bin, and
 the two must be one release. Pin the flake to the matching
 `@evinvest/kitstart-vX.Y.Z` tag.
 
@@ -1214,30 +1214,21 @@ page how to write its links through the route it rewrites to:
 
 ## Publishing
 
-`template/` follows the release on its own: `nix run .#publish` rewrites a
-template range that no longer admits a version it just published to
-`^<version>`, and on a kitstart release moves the `@evinvest/kitstart-v…` pin in
-`template/flake.nix` and this README — all in the release commit, so the tag
-lands on a template that already points at it. kitstart publishes last in a
-run, so its tarball carries the new ranges. A run without kitstart still
-moves the template, but the kitstart tarball already on npm ships the old one,
-so that run ends by printing the `--only @evinvest/kitstart` command that
-releases it. A range the script cannot read, or a branch behind its upstream,
-stops the run before anything is published. `npm test` fails whenever the
-template stops admitting the workspace versions. kitstart's peers must be on
-the registry first, so a release is two runs:
+`nix run .#publish -- <major|minor|patch>` bumps this package, moves the
+`@evinvest/kitstart-v…` pin in `template/flake.nix` and this README to it, and
+tags — all in the release commit, so the tag lands on a template that already
+points at it. The pushed tag is what CI publishes. A branch behind its upstream
+stops the run before anything is tagged.
 
-1. `nix run .#publish -- minor --npm-only --only @evinvest/uikit --only @evinvest/marketing`,
-   then wait until `npm view @evinvest/uikit version` answers the new one;
-2. `nix run .#publish -- minor --npm-only --only @evinvest/kitstart`.
-
-The first publish of a new name in the scope needs an automation or classic
-token: a granular token cannot create a name. Bump the lib flake revision a
-brand pins (`mkLanding`) in the same PR as its npm version.
+The template's other `@evinvest/*` ranges name web_std's packages, released
+from there: move them here by hand when web_std ships a version they do not
+admit. `npm run check:template` installs them from the registry, so a range
+that no longer meets kitstart's peers fails there. Bump the sites_tools
+revision a brand pins (`mkLanding`) in the same PR as its npm version.
 
 ## Shared fixtures with Rust
 
 `tests/fixtures/kitstart/` at the repo root holds the site configs, routing
 decisions and the JSON-LD / metadata / sitemap goldens (aquafix's, verbatim).
-This package's tests and the Rust `kitstart` feature both run them; a change to
+This package's tests and the Rust `kitstart` crate (`rust/`) both run them; a change to
 a builder's output is a change to those files, visible in review.
