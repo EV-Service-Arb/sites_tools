@@ -1,3 +1,4 @@
+import { DAYS } from "@evinvest/sites-contract";
 import type { LeadCaptureText } from "./lead-capture-text";
 import type { Opening } from "./place/hours";
 
@@ -17,12 +18,10 @@ function clockText(hhmm: string, locale: string): string {
   return `${hour}:${m}`;
 }
 
-const WEEKDAY_INDEX = { Monday: 0, Tuesday: 1, Wednesday: 2, Thursday: 3, Friday: 4, Saturday: 5, Sunday: 6 } as const;
-
 /** The weekday in the page's language: a Monday-anchored date read back through `Intl`. */
 function weekdayText(day: Opening["day"], locale: string): string {
   // 2024-01-01 was a Monday; noon UTC is the same day everywhere it matters.
-  const date = new Date(Date.UTC(2024, 0, 1 + WEEKDAY_INDEX[day], 12));
+  const date = new Date(Date.UTC(2024, 0, 1 + DAYS.indexOf(day), 12));
   return new Intl.DateTimeFormat(locale, { weekday: "long", timeZone: "UTC" }).format(date);
 }
 

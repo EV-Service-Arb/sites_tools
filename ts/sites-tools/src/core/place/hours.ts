@@ -1,9 +1,8 @@
+import { DAYS } from "@evinvest/sites-contract";
 import type { DayOfWeek, OpeningHours } from "./types";
 
 /** Every place of the vertical is in France; a brand elsewhere passes its own. */
 export const DEFAULT_TIME_ZONE = "Europe/Paris";
-
-const WEEK: readonly DayOfWeek[] = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
 /** The next opening after a closed moment, read from the place's real hours only. */
 export interface Opening {
@@ -30,7 +29,7 @@ function localTime(at: Date, timeZone: string): Local {
   }
   const parts = fmt.formatToParts(at);
   const part = (type: Intl.DateTimeFormatPartTypes) => parts.find(p => p.type === type)?.value ?? "";
-  const day = WEEK.findIndex(d => d === part("weekday"));
+  const day = DAYS.findIndex(d => d === part("weekday"));
   return { day: day < 0 ? 0 : day, minutes: Number(part("hour")) * 60 + Number(part("minute")) };
 }
 
@@ -58,7 +57,7 @@ function ranges(hours: readonly OpeningHours[]): Range[] {
     const to = clock(slot.closes);
     if (from === null || to === null) continue;
     for (const name of slot.days) {
-      const day = WEEK.indexOf(name);
+      const day = DAYS.indexOf(name);
       if (to > from) out.push({ day, from, to, carried: false });
       else {
         out.push({ day, from, to: 24 * 60, carried: false });
@@ -86,7 +85,8 @@ export function nextOpening(hours: readonly OpeningHours[] | null, at: Date, tim
     const starts = slots.filter(r => r.day === day && (inDays > 0 || r.from > now.minutes)).map(r => r.from);
     if (starts.length === 0) continue;
     const from = Math.min(...starts);
-    const name = WEEK[day] ?? "Monday";
+    const name = DAYS[day];
+    if (name === undefined) throw new Error(`day ${day} of a week of ${DAYS.length}`);
     return { day: name, time: `${String(Math.floor(from / 60)).padStart(2, "0")}:${String(from % 60).padStart(2, "0")}`, inDays };
   }
   return null;
