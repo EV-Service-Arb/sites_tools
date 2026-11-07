@@ -788,7 +788,7 @@ package:
 Visual baselines: `test/visual/` renders each widget to a static page
 (`react-dom/server` over the kit's `tokens.css`), and `nix run
 .#sites-tools-visual` captures and compares them byte for byte on Linux. PNGs
-come from the `sites-tools-visual` CI artifact only.
+come from the `visual-snapshots` artifact of the `visual-baselines` workflow only.
 
 ## Thin `app/` routes
 

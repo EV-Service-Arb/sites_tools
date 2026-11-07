@@ -36,6 +36,11 @@
               scope = "evinvest";
               packagesDir = "ts";
             };
+            visualBaselines = {
+              dir = "ts/sites-tools/test/visual/__screenshots__";
+              render = "visual-render";
+              paths = [ "ts/sites-tools/**" "flake.nix" "flake.lock" ];
+            };
           };
 
           readme = v_flakes.readme-fw {
@@ -199,6 +204,14 @@
           apps.sites-tools-visual = {
             type = "app";
             program = "${sites-tools-visual-app}/bin/sites-tools-visual";
+          };
+
+          apps.visual-render = {
+            type = "app";
+            program = "${pkgs.writeShellApplication {
+              name = "visual-render";
+              text = ''exec ${sites-tools-visual-app}/bin/sites-tools-visual --update'';
+            }}/bin/visual-render";
           };
 
           # `lib.mkLanding` against a stand-in brand: the hermetic npm build from
