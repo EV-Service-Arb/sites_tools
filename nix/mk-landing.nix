@@ -301,9 +301,7 @@ let
       { ${ensureDeps} } >&2 # stdout is `frames`' JSON, or the render's link
       ${linkPlaywright}
       ${exportPlaywright}
-      if [ "''${1:-}" != frames ]; then
-        ${if figmaFile == null then ''echo "✘ figmaFile is null: no render board yet (the figma-render skill creates it)" >&2; exit 1'' else "npm run -s build >/dev/null"}
-      fi
+      [ "''${1:-}" = frames ] || npm run -s build >/dev/null
       exec node_modules/.bin/evinvest-figma-render "$@" -c ${lib.escapeShellArg e2eConfig}${lib.optionalString (figmaFile != null) " --file ${lib.escapeShellArg figmaFile}"}
     '';
   };
@@ -338,7 +336,7 @@ let
         nix run .#dev              next dev on ${sitePort}
         nix run .#test             tsc, lint, vitest, build, size, playwright
         nix run .#accept-test      accept screenshot baselines (Linux only); `-- <name>` for a subset
-        nix run .#figma            build, then every page at every breakpoint onto a new page of figmaFile; `-- frames` lists them
+        nix run .#figma            build, then every page at every breakpoint onto a new page of figmaFile (`-- --folder <url> --name <file>`: all of that file); `-- frames` lists them
         nix run .#size             build, then the first-load JS budget   [the one hard gate]
         nix run .#container-smoke  boot the image and hold it to its contract (Linux + docker)
         nix build                  the standalone server
