@@ -129,7 +129,7 @@
     "dist/cli/sites-tools-size.js"
   ],
   "dependencies": {
-    "@evinvest/figma-render": "^0.1.0",
+    "@evinvest/figma-render": "^0.2.0",
     "@evinvest/sites-contract": "^0.1.2",
     "qrcode-generator": "^2.0.4"
   }
