@@ -115,10 +115,11 @@ tolerance is a deliberate commit, with a reason, as raising the budget was.
 - `apps.figma`: the pages of the `@figma` suite (`defineFigmaSuite`, which
   `defineSectionSuite` calls) into Figma, as editable auto-layout frames —
   one per page and Playwright project, rendered exactly as the baselines are.
-  It is `@evinvest/figma-render`'s bin with `-c e2eConfig --file figmaFile`,
-  after a build: `-- frames` prints `{ file, frames }`; without an argument
-  it captures the frames `FIGMA_CAPTURES` names. The agent side of the loop
-  is the `figma-render` skill.
+  It is `@evinvest/figma-render`'s bin with `-c e2eConfig --file figmaFile`:
+  `-- frames` prints `{ file, frames }`; without an argument it builds, then
+  renders every frame onto a new page of `figmaFile` and prints its link
+  (the first run logs in to Figma in the browser). A null `figmaFile` refuses
+  before the build: creating the board is the `figma-render` skill's.
 - `apps.container-smoke`: boots the image with a host port docker picks
   (`-p 127.0.0.1::<port>`: landing ports sit in Linux's ephemeral range), checks
   `/health`, the 302, the page, the OG card, `/.well-known/sa-site` (every

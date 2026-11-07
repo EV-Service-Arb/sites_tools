@@ -65,7 +65,7 @@
   # heap; the floor is the OG render, which dies at 48.
   maxOldSpaceMiB ? 56
 , # The fileKey of the Figma file `apps.figma` renders into; null until the
-  # first render creates it.
+  # figma-render skill creates it.
   figmaFile ? null
 ,
 }:
@@ -298,12 +298,11 @@ let
     runtimeInputs = [ nodejs pkgs.git pkgs.coreutils pkgs.playwright-test ];
     text = ''
       cd "$(git rev-parse --show-toplevel)"
-      { ${ensureDeps} } >&2 # stdout is `frames`' JSON
+      { ${ensureDeps} } >&2 # stdout is `frames`' JSON, or the render's link
       ${linkPlaywright}
       ${exportPlaywright}
       if [ "''${1:-}" != frames ]; then
-        : "''${FIGMA_CAPTURES:?a JSON object of captureId and endpoint per frame, keyed as frames lists them}" # fails before the build, not after it
-        npm run -s build >/dev/null
+        ${if figmaFile == null then ''echo "✘ figmaFile is null: no render board yet (the figma-render skill creates it)" >&2; exit 1'' else "npm run -s build >/dev/null"}
       fi
       exec node_modules/.bin/evinvest-figma-render "$@" -c ${lib.escapeShellArg e2eConfig}${lib.optionalString (figmaFile != null) " --file ${lib.escapeShellArg figmaFile}"}
     '';
@@ -339,7 +338,7 @@ let
         nix run .#dev              next dev on ${sitePort}
         nix run .#test             tsc, lint, vitest, build, size, playwright
         nix run .#accept-test      accept screenshot baselines (Linux only); `-- <name>` for a subset
-        nix run .#figma            build, then the pages FIGMA_CAPTURES asks for into Figma; `-- frames` lists them
+        nix run .#figma            build, then every page at every breakpoint onto a new page of figmaFile; `-- frames` lists them
         nix run .#size             build, then the first-load JS budget   [the one hard gate]
         nix run .#container-smoke  boot the image and hold it to its contract (Linux + docker)
         nix build                  the standalone server
