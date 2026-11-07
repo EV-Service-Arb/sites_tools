@@ -20,7 +20,7 @@ stays in the brand.
 | `@evinvest/sites-tools/next/config` | `next.config.ts`, `vitest.config.ts` | `withLanding`, `buildEnv` and the `assets/` readers |
 | `@evinvest/sites-tools/react` | either side | `LangSwitch`, `CallBar`, `StatusScreen`, `PlaceDirectory`, `AreaChips`, `Coverage`, `MapFacade` (client), `QuoteFormShell`, `FormSelect` (client) with `loadLazyParts` for tests, `LeadCapture` (client), `LeadBooking` (client) and its adapters, `Faq`, `AnalyticsBoundary` (client), plus the kit and marketing pieces a landing composes with |
 | `@evinvest/sites-tools/testing` | a brand's vitest | `describeLandingContract(site, { root, globalsCss, proxySource, text })` (`root` required: it holds the mounted `/health` and `/.well-known/sa-site`), `describeLeadStoreContract(name, harness)`, `storefrontPlace`, `serviceAreaPlace`, `testLead` |
-| `@evinvest/sites-tools/testing/e2e` | a brand's Playwright | `defineSectionSuite(sections)` (baselines, and the `@figma` frames), `defineFigmaSuite(sections)` (over `@evinvest/figma-render`, the QA menu hidden), `settle(page, selector)`, `BREAKPOINTS` |
+| `@evinvest/sites-tools/testing/e2e` | a brand's Playwright | `defineSectionSuite(sections)` (baselines, and the `@figma` frames), `@evinvest/figma-render`'s `defineFigmaSuite(sections)` and `settle(page, selector)` re-exported, `BREAKPOINTS` |
 | bin `sites-tools-size` | plain node | `sites-tools-size [<build root>] [--route …] [--budget …]`: first-load JS of a place page against the target in `tests/bundle_budget.txt` (passes with a warning up to its tolerance, 20 % by default — see [The bundle budget](#the-bundle-budget)); fails closed |
 
 `vitest` and `@playwright/test` are not peers at all: they are the brand's
@@ -114,7 +114,8 @@ tolerance is a deliberate commit, with a reason, as raising the budget was.
   pinned browsers), `accept-test` (Linux only), `size`, `dev`, `help`.
 - `apps.figma`: the pages of the `@figma` suite (`defineFigmaSuite`, which
   `defineSectionSuite` calls) into Figma, as editable auto-layout frames —
-  one per page and Playwright project, rendered exactly as the baselines are.
+  one per page (a section's URL without its `#`) and Playwright project,
+  rendered exactly as the baselines are.
   It is `@evinvest/figma-render`'s bin with `-c e2eConfig --file figmaFile`:
   `-- frames` prints `{ file, frames }`; without an argument it builds, then
   renders every frame onto a new page of `figmaFile` and prints its link

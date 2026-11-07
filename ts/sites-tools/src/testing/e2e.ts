@@ -1,7 +1,7 @@
 import type { Expect, Page, TestType } from "@playwright/test";
-import { defineFigmaSuite as figmaSuite, settle } from "@evinvest/figma-render";
+import { defineFigmaSuite, settle, type Section as FigmaSection } from "@evinvest/figma-render";
 
-export { settle };
+export { defineFigmaSuite, settle };
 
 /**
  * `@evinvest/sites-tools/testing/e2e` — the section-baseline runner a brand's
@@ -9,18 +9,14 @@ export { settle };
  * breakpoints; every section reached by its own URL (a `#` the site itself
  * links to), never by scrolling to it — a scroll is a moving target the runner
  * would have to guess is over. The same pages, settled the same way, also go
- * to Figma on request (`defineFigmaSuite`, over `@evinvest/figma-render`).
+ * to Figma on request (`@evinvest/figma-render`'s `defineFigmaSuite`).
  *
  * Types only from `@playwright/test`: the brand passes its own `test` and
  * `expect`, so this module loads nothing at run time and cannot end up with a
  * second copy of the runner (Playwright refuses to run with two).
  */
 
-export interface Section {
-  name: string;
-  /** Relative to the config's `baseURL`, or absolute for another host. */
-  url: string;
-  selector: string;
+export interface Section extends FigmaSection {
   /** `md:hidden` in the design: shot only in the `mobile` project. */
   mobileOnly?: boolean;
   /** Shot without the section stylesheet (the call bar hides itself in it). */
@@ -40,11 +36,6 @@ type AnyTest = TestType<any, any>;
 export interface Runner {
   test: AnyTest;
   expect: Expect;
-}
-
-/** The pages of the sections as `@figma` frames, the QA menu hidden. */
-export function defineFigmaSuite({ test }: Pick<Runner, "test">, sections: readonly Section[]): void {
-  figmaSuite({ test }, sections.map(s => s.url), { hide: ["[data-ab-switcher]"] });
 }
 
 /** One `test` per section, each a `toHaveScreenshot` of the settled section, and the `@figma` frames of their pages. */

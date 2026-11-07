@@ -292,7 +292,7 @@ let
     '';
   };
 
-  # The `@figma` frames (sites-tools' `defineFigmaSuite`), by `@evinvest/figma-render`'s bin.
+  # The `@figma` frames (`defineFigmaSuite`, the sections' pages), by `@evinvest/figma-render`'s bin.
   runFigma = pkgs.writeShellApplication {
     name = "${pname}-figma";
     runtimeInputs = [ nodejs pkgs.git pkgs.coreutils pkgs.playwright-test ];
