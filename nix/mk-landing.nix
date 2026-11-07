@@ -292,32 +292,20 @@ let
     '';
   };
 
-  # The `@figma` frames (sites-tools' `defineFigmaSuite`): `frames` lists their
-  # keys; with `FIGMA_CAPTURES` set, the requested ones are captured.
+  # The `@figma` frames (sites-tools' `defineFigmaSuite`), by `@evinvest/figma-render`'s bin.
   runFigma = pkgs.writeShellApplication {
     name = "${pname}-figma";
-    runtimeInputs = [ nodejs pkgs.git pkgs.coreutils pkgs.jq pkgs.playwright-test ];
+    runtimeInputs = [ nodejs pkgs.git pkgs.coreutils pkgs.playwright-test ];
     text = ''
       cd "$(git rev-parse --show-toplevel)"
       { ${ensureDeps} } >&2 # stdout is `frames`' JSON
       ${linkPlaywright}
       ${exportPlaywright}
-      case "''${1:-}" in
-        frames)
-          playwright test -c ${lib.escapeShellArg e2eConfig} --grep @figma --list --reporter=json \
-            | jq --argjson file ${lib.escapeShellArg (builtins.toJSON figmaFile)} \
-              '{ file: $file, frames: [.. | objects | select(.title? == "@figma" and has("specs")) | .specs[] | .title as $page | .tests[] | "\(.projectName) \($page)"] }'
-          ;;
-        "")
-          : "''${FIGMA_CAPTURES:?a JSON object of captureId and endpoint per frame, keyed as frames lists them}"
-          npm run -s build >/dev/null
-          playwright test -c ${lib.escapeShellArg e2eConfig} --grep @figma
-          ;;
-        *)
-          echo "usage: nix run .#figma [-- frames]" >&2
-          exit 1
-          ;;
-      esac
+      if [ "''${1:-}" != frames ]; then
+        : "''${FIGMA_CAPTURES:?a JSON object of captureId and endpoint per frame, keyed as frames lists them}" # fails before the build, not after it
+        npm run -s build >/dev/null
+      fi
+      exec node_modules/.bin/evinvest-figma-render "$@" -c ${lib.escapeShellArg e2eConfig}${lib.optionalString (figmaFile != null) " --file ${lib.escapeShellArg figmaFile}"}
     '';
   };
 
