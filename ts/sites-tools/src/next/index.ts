@@ -12,4 +12,5 @@ export { ogRoute, type OgCard, type OgFont, type OgOptions } from "./og";
 export { ogPalette, type OgColours } from "./og-palette";
 export { quoteRoute, type QuoteRouteDeps, type UnavailableCopy } from "./quote-route";
 export { bookingRoute, type BookingRouteDeps } from "./booking-route";
+export { kitEventsRoute, kitPhotoRoute, type KitDeps } from "./kit-route";
 export { CONFIRM_PATH, confirmQuery, confirmRoute, SHOWN_PARAM, type ConfirmRouteDeps } from "./confirm-route";

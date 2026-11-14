@@ -15,7 +15,7 @@ import type { Site } from "./site";
  * unprefixed page                → 302 to /<cookie ?? Accept-Language>/…
  * any other path                 → gone: the 404 in the page's (or the
  *                                  negotiated) language, for its place
- * /_next/…, a NON_PAGE_ROUTES path, a site's `publicFiles` → pass
+ * /_next/…, a NON_PAGE_ROUTES path or under one, a site's `publicFiles` → pass
  * ```
  *
  * A path with an extension is no exception: `/wp-login.php` or `/fr/x.php`
@@ -38,7 +38,7 @@ export const LANG_COOKIE_MAX_AGE = 31536000;
 export const HOST_MARK = "_";
 export const GONE = "404";
 export const GONE_HEADER = "x-landing-not-found";
-export const NON_PAGE_ROUTES = ["/quote", "/quote/booking", "/quote/confirm", "/og", "/health", "/.well-known/sa-site", "/sitemap.xml", "/robots.txt"] as const;
+export const NON_PAGE_ROUTES = ["/quote", "/quote/booking", "/quote/confirm", "/og", "/health", "/.well-known/sa-site", "/sitemap.xml", "/robots.txt", "/avis"] as const;
 
 /**
  * The path no route matches, in a language.
@@ -75,7 +75,7 @@ export function parseGoneHeader(value: string | null): { locale?: string; locati
 export const PASS_PATHS: readonly string[] = NON_PAGE_ROUTES;
 
 function isInfrastructure(pathname: string, publicFiles: readonly string[]): boolean {
-  return (NON_PAGE_ROUTES as readonly string[]).includes(pathname) || publicFiles.includes(pathname) || pathname.startsWith("/_next/");
+  return NON_PAGE_ROUTES.some(r => pathname === r || pathname.startsWith(`${r}/`)) || publicFiles.includes(pathname) || pathname.startsWith("/_next/");
 }
 
 /** The `[location]` param for a slug in a mode: `_royat` on its host, `royat` through the apex. */

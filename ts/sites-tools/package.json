@@ -38,6 +38,11 @@
       "import": "./dist/next/config/index.js",
       "default": "./dist/next/config/index.js"
     },
+    "./next/kit": {
+      "types": "./dist/next/kit/index.d.ts",
+      "import": "./dist/next/kit/index.js",
+      "default": "./dist/next/kit/index.js"
+    },
     "./react": {
       "types": "./dist/react/index.d.ts",
       "import": "./dist/react/index.js",
@@ -131,6 +136,7 @@
   "dependencies": {
     "@evinvest/figma-render": "^0.4.0",
     "@evinvest/sites-contract": "^0.1.2",
+    "geist": "^1.9.2",
     "qrcode-generator": "^2.0.4"
   }
 }

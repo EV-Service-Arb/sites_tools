@@ -204,6 +204,34 @@
       }
     },
     {
+      "name": "passes the review kit's page, on a point's host",
+      "site": "aquafix",
+      "request": {
+        "host": "royat.aquafix.top",
+        "pathname": "/avis/royat",
+        "query": "qr",
+        "acceptLanguage": null,
+        "cookieLang": null
+      },
+      "decision": {
+        "kind": "pass"
+      }
+    },
+    {
+      "name": "passes what is under the review kit's page",
+      "site": "aquafix",
+      "request": {
+        "host": "aquafix.top",
+        "pathname": "/avis/royat/photos/3.jpg",
+        "query": "qr",
+        "acceptLanguage": null,
+        "cookieLang": null
+      },
+      "decision": {
+        "kind": "pass"
+      }
+    },
+    {
       "name": "passes /_next/static/x.js",
       "site": "aquafix",
       "request": {
