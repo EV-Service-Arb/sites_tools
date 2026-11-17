@@ -4,6 +4,8 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vites
 import type { FormSelectProps } from "../src/react/index";
 import { freshKit, heldChunk, hydrate, landAll, mount, serverHtml, type FreshKit } from "./support/cold";
 
+vi.setConfig({ testTimeout: 60_000 }); // each test imports the kit afresh (`freshKit`): seconds of transform, more on a loaded machine
+
 // FormSelect before its scripted list (`FormSelectKit`) is here: the native
 // select is the live field, and the list is asked for on idle or at the
 // visitor's reach, swapped in only once the native select has no focus.

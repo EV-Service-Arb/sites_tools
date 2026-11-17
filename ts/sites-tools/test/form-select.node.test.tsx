@@ -18,7 +18,7 @@ describe("FormSelect on the server", () => {
     expect(typeof window).toBe("undefined");
     await import("../src/react/index");
     await vi.waitFor(() => expect(asked.list).toBe(true));
-  });
+  }, 60_000); // the kit's first import: seconds of transform, more on a loaded machine
 
   it("renders the native select in one synchronous pass, with no Suspense boundary", async () => {
     const { FormSelect, loadLazyParts } = await import("../src/react/index");
