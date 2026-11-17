@@ -32,6 +32,9 @@
               { name = "checks"; builds = checks; }
             ] ++ pkgs.lib.optional pkgs.stdenv.hostPlatform.isLinux (mkLandingFixture.particles.container-smoke // { name = "mk-landing-smoke"; });
             jobs.warnings.default = true;
+            jobs.warnings.exclude = [ "code-duplication" ];
+            # dictionaries, one per language over one shape
+            jobs.warnings.augment = [{ name = "code-duplication"; args.excludePatterns = [ "**/*-text.ts" "ts/sites-tools/template/src/entities/content/model/{fr,en}.ts" ]; }];
             gitignore.extra = ''
               ## Node / TypeScript
               **/node_modules
