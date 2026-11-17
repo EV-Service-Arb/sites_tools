@@ -49,10 +49,11 @@ export type LeadField = "need" | "locality" | "phone" | "name" | "consent" | (st
 /**
  * A screen of the lead form, as `lead_form_step` names it. `qualify-first`'s
  * two are `need` and `contact`; `steps` reports each screen it moves to —
- * `intro`, `need`, `estimate_<input id>`, `locality`, `phone`. `single` has one
+ * `intro`, `need`, `estimate_<input id>`, `slot`, `locality`, `phone`, a screen
+ * of several questions by its first. `single` has one
  * screen and never reports a step. Slugs only: an input id, never an answer.
  */
-export type LeadStep = "need" | "contact" | "intro" | "locality" | "phone" | `estimate_${string}`;
+export type LeadStep = "need" | "contact" | "intro" | "slot" | "locality" | "phone" | `estimate_${string}`;
 
 /**
  * Every property name an event may carry. A customer's phone or address comes

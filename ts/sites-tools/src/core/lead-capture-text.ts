@@ -61,6 +61,8 @@ export interface LeadCaptureText extends Partial<LeadCaptureFlowText>, Partial<L
   localityPlaceholder?: string | undefined;
   phonePlaceholder?: string | undefined;
   namePlaceholder?: string | undefined;
+  /** The submit of a priced need once its price is shown, `{price}` that price ("Réserver · prix fixe {price}"). None by default: `bookSubmit` stays. */
+  bookSubmitPrice?: string | undefined;
   /** After an optional field's label. */
   optional: string;
   submit: string;
@@ -104,7 +106,7 @@ export interface LeadCaptureFlowText {
   priceBase: string;
   priceRounding: string;
   priceMinimum: string;
-  /** The submit of a priced need. */
+  /** The submit of a priced need, until its price is shown (`bookSubmitPrice` then, when the brand has it). */
   bookSubmit: string;
   /** The in-card success of a priced lead; `{price}` the server's. */
   sentPrice: string;
@@ -124,6 +126,9 @@ export interface LeadCaptureFlowText {
   booked: string;
   /** `manual`: the optional preference, its day and part of the day. */
   preferTitle: string;
+  /** The preferred day's tiles: today's and tomorrow's names, over their weekday. */
+  slotToday: string;
+  slotTomorrow: string;
   preferDay: string;
   preferPart: string;
   partMorning: string;
@@ -175,6 +180,8 @@ const FR_FLOW: LeadCaptureFlowText = {
   bookNote: "Sinon, nous vous rappelons pour fixer le créneau.",
   booked: "Créneau réservé. Merci !",
   preferTitle: "Une préférence pour le créneau ? (facultatif)",
+  slotToday: "Aujourd’hui",
+  slotTomorrow: "Demain",
   preferDay: "Jour",
   preferPart: "Moment de la journée",
   partMorning: "Matin",
@@ -214,6 +221,8 @@ const EN_FLOW: LeadCaptureFlowText = {
   bookNote: "Otherwise we will call you to set the slot.",
   booked: "Slot booked. Thank you!",
   preferTitle: "A preferred slot? (optional)",
+  slotToday: "Today",
+  slotTomorrow: "Tomorrow",
   preferDay: "Day",
   preferPart: "Time of day",
   partMorning: "Morning",

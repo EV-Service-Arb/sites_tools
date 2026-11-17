@@ -677,7 +677,7 @@ describe("LeadCapture's in-card success", () => {
     const done = vi.fn(() => "C’est noté.");
     render(capture({ done }));
     await send("quote-callback-form");
-    expect(done).toHaveBeenCalledWith({ channel: "callback", phone: "06 12 34 56 78", name: null });
+    expect(done).toHaveBeenCalledWith({ channel: "callback", phone: "06 12 34 56 78", name: null, fields: expect.objectContaining({ channel: "callback", mobile: "06 12 34 56 78" }) });
     expect(screen.getByRole("status")).toHaveTextContent("C’est noté.");
   });
 

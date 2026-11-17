@@ -18,7 +18,7 @@ stays in the brand.
 | `@evinvest/sites-tools/proxy` | edge | `createProxy(site)`, `PROXY_MATCHER` |
 | `@evinvest/sites-tools/next` | Next server (routes, RSC) | `quoteRoute`, `bookingRoute`, `confirmRoute`, the review kit's `kitPhotoRoute` / `kitEventsRoute` (`app/avis/[slug]/…`, signed to the conductor with the ingest key), `sitemapRoute`, `robotsRoute`, `ogRoute`, `healthRoute`, `siteReportRoute`, `createPlaceLoader`, `loadLocale`, `placeMetadata` / `brandMetadata` / `statusMetadata`, `metadataBase` |
 | `@evinvest/sites-tools/next/config` | `next.config.ts`, `vitest.config.ts` | `withLanding`, `buildEnv` and the `assets/` readers |
-| `@evinvest/sites-tools/react` | either side | `LangSwitch`, `CallBar`, `StatusScreen`, `PlaceDirectory`, `AreaChips`, `Coverage`, `MapFacade` (client), `QuoteFormShell`, `FormSelect` (client) with `loadLazyParts` for tests, `LeadCapture` (client), `LeadBooking` (client) and its adapters, `Faq`, `AnalyticsBoundary` (client), plus the kit and marketing pieces a landing composes with |
+| `@evinvest/sites-tools/react` | either side | `LangSwitch`, `CallBar`, `StatusScreen`, `PlaceDirectory`, `AreaChips`, `Coverage`, `MapFacade` (client), `QuoteFormShell`, `FormSelect` (client) with `loadLazyParts` for tests, `LeadCapture` (client) and the booking adapters, `Faq` (`open`: the item drawn open), `AnalyticsBoundary` (client), plus the kit and marketing pieces a landing composes with |
 | `@evinvest/sites-tools/next/kit` | `app/avis/` (RSC) | the review kit's `kitPage` (the conductor's offer → Google's form, the drafts or the one tap) and `KitDocument`, its own root layout (Geist, none of the brand's styles) |
 | `@evinvest/sites-tools/testing` | a brand's vitest | `describeLandingContract(site, { root, globalsCss, proxySource, text })` (`root` required: it holds the mounted `/health` and `/.well-known/sa-site`), `describeLeadStoreContract(name, harness)`, `storefrontPlace`, `serviceAreaPlace`, `testLead` |
 | `@evinvest/sites-tools/testing/e2e` | a brand's Playwright | `defineSectionSuite(sections)` (baselines, and the `@figma` frames), `@evinvest/figma-render`'s `defineFigmaSuite(sections)` and `settle(page, selector)` re-exported, `BREAKPOINTS` |
@@ -261,33 +261,33 @@ it is the plain POST to `/quote` it always was.
 |---|---|
 | `place`, `contact` | the hours order the channels, the service area suggests the commune; `contact` is `contactOf(site, place)` — a `null` number is a channel not offered |
 | `locale`, `renderedAt` | the page's language; the render stamp (time trap, and "now" until the script runs) |
-| `wire`, `needs` | `site.lead.wire`; the subjects with their labels, an `icon` each (any node, the brand's — the kit ships none) for `needDisplay="cards"`, and an optional `shortLabel` drawn on tiles under `sm` |
+| `wire`, `needs` | `site.lead.wire`; the subjects with their labels, an `icon` each (any node, the brand's — the kit ships none) for `needDisplay="cards"`, an optional `shortLabel` drawn on tiles under `sm` and a `hint`, a line under the label. A `fixed` need's tile shows its price, from `pricing` (`optionPrice`) |
 | `need` | the need the page already knows — also set by `?need=` and by a tap on any `[data-need="…"]` element. `?postcode=` fills the postcode the same way |
 | `layout` | `single` (default) · `steps`: one question per screen — see [One question per screen](#one-question-per-screen-layoutsteps) · `qualify-first`: a tile per need, then the contact step (the two screens `steps` grew from, kept as they were) |
 | `needDisplay` | how the need is asked: `select` (default on `single`) · `tiles` (default otherwise) · `cards`, a grid with each need's `icon` |
-| `intro`, `localityStep` | `steps` only: a question before the need, posted as a brand's extra, whose answer may turn the form into a callback · the postcode on its own screen (`own`, default) or on the phone's (`with-phone`) |
+| `intro`, `screens` | `steps` only: a question posted as a brand's extra, whose answer may turn the form into a callback or ask the slot · how the questions share screens, each with its heading — see [One question per screen](#one-question-per-screen-layoutsteps) |
 | `focusNext` | on one screen: after a choice the focus moves to the next empty field, and Enter in a field moves to the next empty one before it submits. Off by default; always so in `steps` |
-| `questions` | by estimate input id: `{ display?: "tiles" \| "cards", unknown?: true, unknownSpan?: 2, badges?: { [option]: text }, shortLabels?: { [option]: text }, previewLabels?: { [option]: text }, step?: number, next?: string }` — see [The compact form](#the-compact-form) and [steps](#one-question-per-screen-layoutsteps) |
+| `questions` | by estimate input id: `{ display?: "tiles" \| "cards", unknown?: true, unknownSpan?: 2, badges?: { [option]: text }, shortLabels?: { [option]: text }, previewLabels?: { [option]: text } }` — see [The compact form](#the-compact-form) |
 | `price`, `taxCredit` | `box` (default) · `compact`: the price on one line, what is left after a tax credit of `taxCredit` (a ratio, `0.5`), the breakdown behind "Détail" |
 | `afterPhone` | a node right under the phone field: one line of reassurance |
 | `channelsDisplay`, `channelIcons` | the other ways out: `stack` (default, under `otherChannels`) · `row`, one row of compact buttons named by `otherChannels` · the brand's icon per channel (`phone`, `whatsapp`, `sms`, `callback`, `telegram`) |
-| `locality` | `required` (default) · `optional` |
+| `locality` | `{ ask: "postcode" \| "address", optional?: true }`: a postcode, required, by default. `address`: a street address — the browser's address autofill, the letters' keyboard, nothing filled in or offered (not the place's commune, not `?postcode=`), and never in a messenger's message |
 | `name` | `{ field, required? }`: a name field posted as the brand's extra; off by default |
 | `extras` | the brand's own fields, after the phone |
 | `prefer` | a channel moved first when available (a `default_channel` arm) |
 | `experiment` | `{ name, variant }`, slugs: on every event and posted with the form |
 | `timeZone` | `Europe/Paris` by default |
 | `formId`, `id` | `quote` · `quote`: the id is the card's (root), so `#quote` scrolls to the whole card, head included; the form is `<id>-form`, the callback `<id>-callback` (its form `<id>-callback-form`). Both forms post it as `card`, so a refused lead comes back to `#<id>` |
-| `text` | `LeadCaptureText`: `LEAD_CAPTURE_TEXT.fr` / `.en`, plain strings (`{need}`, `{day}`, `{time}` filled in); optional `localityPlaceholder`, `phonePlaceholder`, `namePlaceholder` (none by default). The errors are words of the page too: `phoneInvalid`, `required`, `needRequired`, `consentRequired`, `fieldInvalid`, `formInvalid`, and the post's `sending`, `networkError`, `timeoutError`, `retry` — a brand spreading `LEAD_CAPTURE_TEXT` has them |
+| `text` | `LeadCaptureText`: `LEAD_CAPTURE_TEXT.fr` / `.en`, plain strings (`{need}`, `{day}`, `{time}` filled in); optional `localityPlaceholder`, `phonePlaceholder`, `namePlaceholder` and `bookSubmitPrice` — a priced need's submit once its price is shown, `{price}` that price ("Réserver · prix fixe {price}") — none by default. The errors are words of the page too: `phoneInvalid`, `required`, `needRequired`, `consentRequired`, `fieldInvalid`, `formInvalid`, and the post's `sending`, `networkError`, `timeoutError`, `retry` — a brand spreading `LEAD_CAPTURE_TEXT` has them |
 | `labels` | `visible` (default) · `hidden`: every field's label `sr-only` — still the field's accessible name — for a design that draws placeholders |
 | `callbackOpen` | whether the callback starts open; by default only when it leads (the place is closed). `#<id>-callback` opens it either way |
-| `done` | the card after a lead is taken — a node, or `(sent: LeadSent) => node` (`{ channel, phone, name }`), shown in place. Without it, a lead taken goes to the thanks page the route names. Either way a script posts the form itself (asking `/quote` for JSON), so a refusal keeps what was typed; an answer that is not the route's, or no network, submits the form for real; without a script nothing changes (303) |
+| `done` | the card after a lead is taken — a node, or `(sent: LeadSent) => node` (`{ channel, phone, name, fields, slot? }`: `fields` every field posted with a value, by name — the need, the intro's answer, the brand's extras; `slot` the preference the server kept), shown in place. Without it, a lead taken goes to the thanks page the route names. Either way a script posts the form itself (asking `/quote` for JSON), so a refusal keeps what was typed; an answer that is not the route's, or no network, submits the form for real; without a script nothing changes (303) |
 | `flows`, `pricing`, `photos` | how each need is sold (`site.lead.flows`), the page's price list (`createPricingSource(site).model()`), and the `quote` needs priced from photos — see [Form variants](#form-variants-quote-estimate-fixed) |
-| `booking` | after a priced lead, in place of the place's booking (`LeadBooking`, from `place.booking`): a node or `(sent) => node` |
+| `booking` | after a priced lead, in place of the place's booking (from `place.booking`): a node (`null`: nothing), or `(sent, kit) => node`, handed the kit's booking for that lead to keep or drop |
 | `bookingVariant` · `bookingEmbed` · `bookingAdapters` | the `booking_provider` variant that picks the place's provider · the providers' embeds (after cookie consent) rather than a new tab · the brand's adapters over the built-ins (from a client component) — see [Booking](#booking-manual-link-google_calendar-cal_com) |
 | `initialError` | `leadErrorOf(searchParams)` on a page that reads its query: the refusal a 303 brought back, drawn on the server by the card it names (`lead_card`) so the card says why without a script (see *Refusals*) |
 | `head`, `trust` | the brand's heading instead of the title; a slot beside the submit. Like `extras`, `done` and `booking`, any node, built on the server or not, and never asked for a `key`: each slot sits alone in a keyed fragment |
-| `className` · `classNames` | the root · its parts: `root`, `head`, `title`, `lede`, `form`, `contact`, `field`, `label`, `control` (every input, the need's select in both states, the callback's phone), `hint`, `error` (a refusal: under the field, or above the submit), `chips`, `chip`, `needs`, `need`, `summary`, `icon` (a need's or an intro answer's icon), `submit`, `trust`, `privacy` (not drawn when `text.privacy` is `""`), `opening`, `others`, `channel`, `channelIcon`, `primary`, `callback`, `callbackSummary`, `callbackForm`, `callbackLede`, `callbackSubmit`, `consent`, `done`, for `steps` `progress`, `stepBack`, `step` (each screen), `answers`, `answer` (the chips of the screens answered), `stepNext`, `intro`, `introOption`, and for the flows `estimate`, `estimateInput`, `estimateLegend`, `estimateGrid` (an input's answers: 2 columns, 3 from `sm`), `estimateOption` (an answer's tile), `estimateUnknown` (the "I don't know" tile, after `estimateOption`), `badge`, `optionPrice` (a card's total), `price`, `priceTotal`, `breakdown`, `priceNote`, `priceLine`, `priceTaxCredit`, `priceDetail` (`price="compact"`: the «Détail» trigger), `priceDetailContent` (its popover), `photos`, `priced`, `pricedPrice`, `pricedNote`, and for the booking `booking`, `bookingCta`, `bookingNote`, `prefer`, `preferOption`, `preferSubmit`, and for a `messenger` variant `messenger`, `messengerSlot`, `messengerCta`, `messengerSecondary`, `messengerSquare`, `messengerSegment`, `messengerTile`, `messengerTrigger`, `messengerPreview`, `messengerPicker`, `messengerOption`, `messengerQr`, `messengerReturn`, `messengerHint` |
+| `className` · `classNames` | the root · its parts: `root`, `head`, `title`, `lede`, `form`, `contact`, `field`, `label`, `control` (every input, the need's select in both states, the callback's phone), `hint`, `error` (a refusal: under the field, or above the submit), `chips`, `chip`, `needs`, `need`, `summary`, `icon` (a need's or an intro answer's icon), `submit`, `trust`, `privacy` (not drawn when `text.privacy` is `""`), `opening`, `others`, `channel`, `channelIcon`, `primary`, `callback`, `callbackSummary`, `callbackForm`, `callbackLede`, `callbackSubmit`, `consent`, `done`, for `steps` `progress`, `stepBack`, `step` (each screen), `answers`, `answer` (the chips of the screens answered), `stepNext`, `intro`, `introOptions` (its grid), `introOption`, `optionHint` (a tile's line under its label), and for the flows `estimate`, `estimateInput`, `estimateLegend`, `estimateGrid` (an input's answers: 2 columns, 3 from `sm`), `estimateOption` (an answer's tile), `estimateUnknown` (the "I don't know" tile, after `estimateOption`), `badge`, `optionPrice` (a card's total), `price`, `priceTotal`, `breakdown`, `priceNote`, `priceLine`, `priceTaxCredit`, `priceDetail` (`price="compact"`: the «Détail» trigger), `priceDetailContent` (its popover), `photos`, `priced`, `pricedPrice`, and for the booking `booking`, `bookingCta`, `bookingNote`, `prefer`, `preferOption`, `preferSubmit`, and for a `messenger` variant `messenger`, `messengerSlot`, `messengerCta`, `messengerSecondary`, `messengerSquare`, `messengerSegment`, `messengerTile`, `messengerTrigger`, `messengerPreview`, `messengerPicker`, `messengerOption`, `messengerQr`, `messengerReturn`, `messengerHint` |
 | `messenger`, `messengers`, `refPrefix`, `brand`, `messengerTiming` | the `lead_channel` arm (`MessengerVariant`, absent → the control) · `messengerFacts(site, place)` · the chat reference's prefix (`AQ`) · the message's greeting · the estimate's question whose answer is the message's timing line (`{ input: "frequency" }`) — see *Messengers* below |
 
 - **Taps.** A need the page knows is not asked again, and a place serving one
@@ -377,8 +377,9 @@ it is the plain POST to `/quote` it always was.
   refused it, `false` the phone hint showed — the field's role, never its
   value), `lead_form_submit_error {reason, channel}` (`network` /
   `timeout`), `lead_form_step {step}`
-  (`contact` / `need` in `qualify-first`; in `steps` each screen moved to —
-  `intro`, `need`, `estimate_<input>`, `locality`, `phone`), each with `form_id`, `layout`, `experiment`,
+  (`contact` / `need` in `qualify-first`; in `steps` each screen moved to,
+  by its first question — `intro`, `need`, `estimate_<input>`, `slot`,
+  `locality`, `phone`), each with `form_id`, `layout`, `experiment`,
   `variant`; `contact_intent_click {channel}` for `phone`, `whatsapp`, `sms`,
   `callback`, with the experiment; and on the server `lead_form_submit
   {form_id, channel}` and `lead_form_reject {form_id, channel, field,
@@ -520,20 +521,42 @@ import { messengerFacts } from "@evinvest/sites-tools";
 <LeadCapture … layout="steps" needDisplay="cards" price="compact" taxCredit={0.5}
   questions={{ surface: { unknown: true }, frequency: { display: "cards", badges: { biweekly: "Le plus avantageux" } } }}
   intro={{ label: "C’est pour quand ?", field: "urgency", options: [
-    { value: "today", label: "Urgent — aujourd’hui", channel: "callback" },
+    { value: "today", label: "Urgent — aujourd’hui", hint: "rappel sous 15 min", channel: "callback" },
     { value: "week", label: "Cette semaine" },
   ] }}
   afterPhone={<p>Votre numéro reste entre nous — rappel sous 15 min.</p>} channelsDisplay="row" />
 ```
 
-- **Screens.** The intro question when there is one; the need; each of the
-  estimate's questions; the postcode (`localityStep="own"`, the default, or
-  with the phone, `with-phone`); the phone, always last, with the price, the
-  name and the brand's extras and the submit. A tap answers and moves on
-  (from the keyboard the tiles are a radio group: arrows choose, Enter or
-  Space answers); the postcode moves on with "Continuer" or Enter. The
+- **Screens.** Each question on a screen of its own, in this order: the
+  intro when there is one; the need; each of the estimate's questions; the
+  slot (below); the postcode; the phone, always last, with the name, the
+  price, the brand's extras and the submit. A tap answers a screen of one
+  tile question and moves on (from the keyboard the tiles are a radio group:
+  arrows choose, Enter or Space answers); any other screen moves on with its
+  button ("Continuer", `stepNext`) or Enter in its last typed field. The
   focus goes to the new screen's field — inside the tap when that is a typed
   field, so iOS opens the keyboard.
+- **Screens of several questions** (`screens`): the brand groups them, each
+  screen its questions in order — `intro`, `need`, `slot`, `locality`,
+  `name`, `phone`, an estimate input's id — its heading (`head`, the card's
+  while the screen is on) and its button's words (`next`):
+
+  ```tsx
+  screens={[
+    { ask: ["need", "intro"], head: <CardHead … /> },
+    { ask: ["slot"], head: <SlotHead … /> },
+    { ask: ["name", "phone", "locality"], head: <ContactHead … /> },
+  ]}
+  ```
+
+  A screen stands where the first of its questions would; a question on
+  none keeps a screen of its own; a question not asked now (an estimate's
+  the price list dropped, the slot) leaves it. A screen of several
+  questions moves on by its button only, which says which one is missing —
+  the intro too, once a script runs — so an answer can be changed before
+  it does. The phone's screen is the last and holds only the postcode, the
+  name and the phone, in the order listed; a question listed twice, or
+  another on the phone's screen, is refused (it throws).
 - **Over the screens** a thin bar (`progress`; the screen is read out as
   `stepProgress`, "Étape 2/4", never drawn), "Retour" (`stepBack`), and the
   screens answered as chips (`answers`, `answer`), each a tap back to its
@@ -542,27 +565,35 @@ import { messengerFacts } from "@evinvest/sites-tools";
   open), so the bar only moves forward as the visitor answers; until the
   intro is answered — its branches differ in length — no total is said
   (`stepProgressOpen`, "Étape 1").
-- **Questions sharing a screen** (`questions: { bedrooms: { step: 1, next:
-  "Voir les prix" }, surface: { step: 1 } }`): questions with the same `step`
-  number are one screen. It moves on by itself once all are answered; until
-  then the focus goes to the next question, and the button (`next` of the
-  first, else `stepNext`) says which one is missing.
 - **Never asked twice.** A need the page knows (`need`, `?need=`, a
   `[data-need]` card) and a postcode it knows (`?postcode=`, a place serving
   one commune) are answered screens: a chip, not a question.
-- **The intro** (`intro: { label, field, options }`) is posted under `field`
-  — declare it in `site.lead.extras` (`{ name: "urgency", max: 16 }`) and it
-  is stored and mailed with the lead like any extra. An answer with
-  `channel: "callback"` cuts the form to the phone and the callback's
-  consent, posted as a callback lead (`channel=callback`, `callbackSubmit`);
-  the folded callback is then not offered a second time.
+- **The intro** (`intro: { label, field, options }`, each option a `label`,
+  a `hint` line, an `icon`) is posted under `field` — declare it in
+  `site.lead.extras` (`{ name: "urgency", max: 16 }`) and it is stored and
+  mailed with the lead like any extra. An answer with `channel: "callback"`
+  cuts the form to the phone and the callback's consent, posted as a
+  callback lead (`channel=callback`, `callbackSubmit`); the folded callback
+  is then not offered a second time.
+- **The slot.** An answer with `slot` asks the slot the visitor prefers on a
+  screen before the contact: `today` — today chosen among the days, and a
+  part of the day; `later` — a day from tomorrow, and its part (`preferDay`,
+  `preferPart`, the days by `slotToday`, `slotTomorrow` and their date). Only
+  for a priced need (`estimate`, `fixed`) and the visitor's booking `manual`
+  (`bookingOf`). Posted with the lead (`preferred_date`, `preferred_part`):
+  the server holds it to `booking.requested@1`'s rules, stores it (schema 9),
+  answers it (`LeadSent.slot`) and queues `booking.requested@1` (`manual`)
+  behind the lead's `lead.created` — see [Booking](#booking-manual-link-google_calendar-cal_com).
+  A slot it refuses (a stale day, a forged part) is dropped and logged, and
+  the lead taken. After the lead the card asks nothing more: "Préférence
+  notée" (`preferSent`) for a slot kept, else the call (`slotCallback`).
 - **A refusal** opens the screen of the field it is about (the phone's for
   anything the form cannot place).
-- **Without a script** every screen is in the form, hidden but posted; a
-  `<noscript>` style shows them all at once and hides the bar, the back link,
-  the chips and "Continuer": the form posts as one, as `qualify-first` does.
-  The server draws the same screen the script starts on — no shift at
-  hydration.
+- **Without a script** every screen is in the form, hidden but posted, the
+  slot's too (nothing of it required); a `<noscript>` style shows them all
+  at once and hides the bar, the back link, the chips and the buttons: the
+  form posts as one, as `qualify-first` does. The server draws the same
+  screen the script starts on — no shift at hydration.
 
 ### The compact form
 
@@ -685,7 +716,8 @@ export const POST = quoteRoute(site, { env: serverEnv, notifier, pricing, unavai
   changé : 86 € au lieu de 77 €"); the next submit posts it and is taken. A
   plain post goes to `/quote/confirm` (`confirmRoute`) — never back to its
   card, whose page may be a cached render still showing the old price, so
-  every resubmit would be refused again. The confirmation is never cached:
+  every resubmit would be refused again (a slot asked on the steps is not
+  carried, as an extra is not; the call sets it). The confirmation is never cached:
   it prices the answers afresh, says the price changed, and asks again for
   the phone and the postcode — the URL carries only the need, the answers,
   the page's ids and the price seen, nothing typed (a brand's extra fields
@@ -735,8 +767,9 @@ export const POST = bookingRoute({ env: serverEnv, webhook });
 
 - **The config** (`BookingConfig`): `{ default, providers: { <provider>: { url } } }`.
   `manual` has no page and is always available: the card promises a call and
-  offers an optional preference — a day of the coming week and a part of the
-  day (`morning | afternoon | evening`), no free text. `link` — any booking
+  offers an optional preference — a day of the coming week, from today, and a
+  part of the day (`morning | afternoon | evening`), no free text — unless the
+  steps asked it already (an intro answer's `slot`). `link` — any booking
   page, opened with `ref=<leadRef>`. `google_calendar` — a schedule on
   `calendar.app.google` or `calendar.google.com/calendar/appointments/…`,
   opened as is: it takes no parameter, so the card asks the visitor to type
@@ -771,9 +804,11 @@ export const POST = bookingRoute({ env: serverEnv, webhook });
   `LeadCapture` registers a brand's own by provider name (from a client
   component — a server one cannot pass functions). A provider no adapter
   knows promises the call.
-- **`booking.requested@1`.** Opening a provider's page, or sending a
-  `manual` preference, posts `{ submission, lead_ref, provider,
-  preferred_date?, preferred_part? }` to `/quote/booking` (`bookingRoute`).
+- **`booking.requested@1`.** A slot asked on the steps is posted with the
+  lead, and `/quote` queues the request itself. Opening a provider's page, or
+  sending a `manual` preference after the lead, posts `{ submission,
+  lead_ref, provider, preferred_date?, preferred_part? }` to `/quote/booking`
+  (`bookingRoute`).
   The submission id proves the lead is this page's (a `lead_ref` alone books
   nothing); only a priced lead (`estimate`, `fixed`) books; one request per
   lead. It is queued on the lead webhook's outbox — see the lead webhook. A
@@ -889,7 +924,8 @@ chooses per visitor answer `Cache-Control: private, no-store`.
   Schema 6 adds `submission_id` under a unique index (where present): one
   row per script submission, read back by `findSubmission`. Schema 7 adds
   the flow and the price a lead was taken at (`flow`, `quoted_cents`,
-  `pricing_valid_from`, `estimate_inputs`), all nullable.
+  `pricing_valid_from`, `estimate_inputs`), all nullable. Schema 9 adds the
+  slot asked on the steps (`preferred_date`, `preferred_part`), nullable.
 - **Mail is checked at boot.** With `SMTP_URL` set, `leadNotifier` throws when
   it is built if the URL is malformed (the error never repeats it), there is
   no sender (`LEAD_NOTIFY_FROM`, or `leads@<domain>`) or no recipient

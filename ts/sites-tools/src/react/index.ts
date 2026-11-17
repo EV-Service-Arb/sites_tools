@@ -1,8 +1,8 @@
 /**
  * `@evinvest/sites-tools/react` — the structural widgets every landing shares,
  * where behaviour matters more than look. Server components by default; only
- * `MapFacade`, `AnalyticsBoundary`, `FormSelect`, `LeadCapture`, `LeadBooking`
- * and `AbSwitcher` are client modules, each its own file with its own
+ * `MapFacade`, `AnalyticsBoundary`, `FormSelect`, `LeadCapture` and
+ * `AbSwitcher` are client modules, each its own file with its own
  * `"use client"`, so a page pays for what it renders. `AbSwitcher` is a gate
  * of a few hundred bytes; its panel (`AbSwitcherPanel`) is a dynamic import,
  * fetched only by a QA visit.
@@ -24,7 +24,6 @@ export { FormSelect, type FormSelectOption, type FormSelectPart, type FormSelect
 export { LangSwitch, withLang, type LangSwitchProps } from "./LangSwitch";
 export { LeadCapture, type LeadCapturePart, type LeadCaptureProps } from "./LeadCapture";
 export { loadLazyParts } from "./lazy-part";
-export { LeadBooking, type LeadBookingProps } from "./LeadBooking";
 export type { BookingPart } from "./LeadBookingManual";
 export {
   BOOKING_ADAPTERS,
@@ -45,7 +44,7 @@ export { BOOKING_ACTION } from "./use-booking";
 export type { LeadSent } from "./use-lead-submit";
 export type { LeadCaptureLayout, LeadNeedDisplay, LeadNeedOption } from "./LeadCaptureNeed";
 export type { EstimateQuestion, EstimateQuestions } from "./LeadCaptureEstimate";
-export type { LeadIntro, LeadIntroOption } from "./lead-steps";
+export type { LeadIntro, LeadIntroOption, LeadScreen } from "./lead-steps";
 export type { ChannelIconKey } from "./LeadCaptureChannels";
 export type { MessengerPart } from "./messenger/types";
 export { MapFacade, type MapFacadePart, type MapFacadeProps } from "./MapFacade";

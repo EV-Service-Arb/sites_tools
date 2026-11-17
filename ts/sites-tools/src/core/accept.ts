@@ -3,6 +3,7 @@ import { HONEYPOT_FIELD, LEGACY_HONEYPOT_FIELDS, RENDERED_AT_FIELD, screen, type
 import { channelOf, isMessengerChannel, MAX_FIELD, readCandidate, validateCandidate, type Lead, type LeadCandidate, type LeadPrice } from "./lead";
 import { priceOf, type LeadFlow, type PricingModel, type SiteChannel } from "@evinvest/sites-contract";
 import { answeredUnknown, flowOf, readEstimateInputs } from "./pricing/flow";
+import { postedPreference } from "./booking/model";
 import type { ChannelsAvailable } from "./messenger";
 import type { Site } from "./site";
 
@@ -224,10 +225,15 @@ async function accept<L extends string, P extends string>(
     now: deps.now,
     limiter: deps.limiter,
   });
+  // The panel's window, on the day the panel will see it arrive (as `bookingRoute`'s).
+  const preference = postedPreference(name => field(form, name), new Date(deps.now).toISOString().slice(0, 10));
+  // The lead is the commit point: a slot it cannot keep is dropped, never a reason to refuse the customer.
+  if (preference === null) deps.log.warn(`quote: a slot preference posted for ${slug ?? "no point"} is not one booking.requested takes; the lead is kept without it`);
   const { consentText, ...rest } = candidate;
   const lead: Lead = {
     ...rest,
     ...sale,
+    ...(preference ? { preference } : {}),
     spamVerdict: verdict === "ok" ? null : verdict,
     // Stamped by the server: the moment it accepted the consent with the lead.
     ...(consentText ? { consent: { text: consentText, at: new Date(deps.now).toISOString() } } : {}),

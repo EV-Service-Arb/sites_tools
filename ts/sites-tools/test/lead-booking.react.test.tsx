@@ -1,21 +1,22 @@
 import type { AnalyticsSink } from "@evinvest/analytics";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { flowTextOf, LEAD_CAPTURE_TEXT, type OpenBookingConfig } from "../src/index";
-import { LeadBooking, type BookingAdapters, type LeadSent } from "../src/react/index";
+import type { BookingAdapters, LeadSent } from "../src/react/index";
+import { LeadBooking } from "../src/react/LeadBooking";
 import { AnalyticsSinkContext } from "../src/react/analytics-context";
 
 const text = flowTextOf(LEAD_CAPTURE_TEXT.fr, "fr");
-const SENT: LeadSent = { channel: "form", phone: "06 12 34 56 78", name: "Jean Dupont", lead: "lead-7-0a1b2c3d", submission: "0b6c3f9e-1d2a-4c5b-8e7f-9a0b1c2d3e4f", cents: 8400 };
+const SENT: LeadSent = { channel: "form", phone: "06 12 34 56 78", name: "Jean Dupont", fields: {}, lead: "lead-7-0a1b2c3d", submission: "0b6c3f9e-1d2a-4c5b-8e7f-9a0b1c2d3e4f", cents: 8400 };
 const NOW = new Date(2026, 9, 4, 10).getTime();
 
-function stand(booking: OpenBookingConfig, over: { sent?: LeadSent; embed?: boolean; adapters?: BookingAdapters } = {}) {
+function stand(booking: OpenBookingConfig, over: { sent?: LeadSent; embed?: boolean; adapters?: BookingAdapters; slotAsked?: boolean } = {}) {
   const events: { event: string; props: Record<string, unknown> }[] = [];
   const sink: AnalyticsSink = { capture: (event, props) => void events.push({ event, props: { ...props } }) };
   const fetch = vi.fn(async (_url: string | URL | Request, _init?: RequestInit) => Response.json({ ok: true, queued: true }));
   vi.stubGlobal("fetch", fetch);
-  const ui: ReactElement = <LeadBooking booking={booking} sent={over.sent ?? SENT} locale="fr" text={text} now={NOW} embed={over.embed} adapters={over.adapters} />;
+  const ui: ReactElement = <LeadBooking booking={booking} sent={over.sent ?? SENT} locale="fr" text={text} now={NOW} embed={over.embed} adapters={over.adapters} slotAsked={over.slotAsked ?? false} />;
   render(<AnalyticsSinkContext.Provider value={sink}>{ui}</AnalyticsSinkContext.Provider>);
   const posted = () => fetch.mock.calls.map(([url, init]) => ({ url: String(url), body: JSON.parse(String(init?.body)) as unknown }));
   return { events, fetch, posted };
@@ -90,7 +91,7 @@ describe("LeadBooking: link and cal_com", () => {
   });
 
   it("only promises the call without the lead's reference", () => {
-    const { fetch } = stand({ provider: "link", url: "https://book.example.fr/vifnet" }, { sent: { channel: "form", phone: "06", name: null } });
+    const { fetch } = stand({ provider: "link", url: "https://book.example.fr/vifnet" }, { sent: { channel: "form", phone: "06", name: null, fields: {} } });
     expect(screen.getByText(text.slotCallback)).toBeInTheDocument();
     expect(screen.queryByRole("link")).toBeNull();
     expect(fetch).not.toHaveBeenCalled();
@@ -118,16 +119,19 @@ describe("LeadBooking: a provider the brand registers", () => {
 });
 
 describe("LeadBooking: manual", () => {
-  it("promises the call and sends an optional preference, day and part of the day", async () => {
+  it("promises the call and sends an optional preference, a day from today and a part of the day", async () => {
     const { posted, events } = stand({ provider: "manual" });
     expect(screen.getByText(text.slotCallback)).toBeInTheDocument();
     const send = screen.getByRole("button", { name: text.preferSubmit });
     expect(send).toBeDisabled();
+    const days = screen.getAllByRole("radio").filter(r => r.getAttribute("name") === "preferred_date");
+    // Today is a day the contract takes: the list starts there, by name, then tomorrow, then weekdays.
+    expect(days.map(d => d.closest("label")?.textContent)).toEqual(["Aujourd’huidim. 4", "Demainlun. 5", "Mar.6 oct.", "Mer.7 oct.", "Jeu.8 oct.", "Ven.9 oct.", "Sam.10 oct."]);
     fireEvent.click(screen.getByLabelText(text.partEvening));
-    fireEvent.click(screen.getAllByRole("radio", { name: /\d/ })[0] as HTMLElement);
+    fireEvent.click(days[0] as HTMLElement);
     fireEvent.click(send);
     expect(await screen.findByText(text.preferSent)).toBeInTheDocument();
-    expect(posted()).toEqual([{ url: "/quote/booking", body: { submission: SENT.submission, lead_ref: SENT.lead, provider: "manual", preferred_date: "2026-10-05", preferred_part: "evening" } }]);
+    expect(posted()).toEqual([{ url: "/quote/booking", body: { submission: SENT.submission, lead_ref: SENT.lead, provider: "manual", preferred_date: "2026-10-04", preferred_part: "evening" } }]);
     expect(events).toEqual([{ event: "lead_booking_open", props: { provider: "manual", form_id: "quote" } }]);
   });
 
@@ -140,5 +144,19 @@ describe("LeadBooking: manual", () => {
     expect(screen.queryByText(text.preferSent)).toBeNull();
     // Review of #185: a brand without the route lost the preference without a word.
     expect(screen.getByText(text.preferFailed)).toBeInTheDocument();
+  });
+});
+
+describe("LeadBooking: manual, after steps that asked the slot", () => {
+  it("asks nothing more: the preference kept with the lead is acknowledged, or the call promised", () => {
+    const { fetch } = stand({ provider: "manual" }, { slotAsked: true, sent: { ...SENT, slot: { date: "2026-10-04", part: "afternoon" } } });
+    expect(screen.getByText(text.preferSent)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: text.preferSubmit })).toBeNull();
+    cleanup();
+    stand({ provider: "manual" }, { slotAsked: true });
+    expect(screen.getByText(text.slotCallback)).toBeInTheDocument();
+    expect(screen.queryByText(text.preferSent)).toBeNull();
+    expect(screen.queryByRole("radio")).toBeNull();
+    expect(fetch).not.toHaveBeenCalled();
   });
 });

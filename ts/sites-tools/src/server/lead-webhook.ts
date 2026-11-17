@@ -48,7 +48,9 @@ export type BookingQueued = { kind: "queued"; row: number } | { kind: "duplicate
 
 export interface LeadWebhook {
   /**
-   * `lead.created@1` for the lead, queued; returns the outbox row. The lead
+   * `lead.created@1` for the lead, queued; returns the outbox row — and, for
+   * a priced lead stored with a slot preference, its `booking.requested@1`
+   * (`manual`) behind it, as `requestBooking`. The lead
    * is named by its `leadRef` (the panel's lead id, which a booking names
    * too); `locationId` is the point the form was posted from, when it is an
    * id the panel takes.
@@ -104,17 +106,18 @@ export function leadWebhook(site: { brand: { id: string } }, env: Pick<ServerEnv
     const at = new Date(now());
     return { id: uuidV7(at.getTime()), occurredAt: at, sourceId, subject };
   };
+  const requestBooking = (request: BookingRequested): BookingQueued => {
+    // The lead's own row, as `enqueue` refs it: the booking follows it, and
+    // a lead never queued (a honeypot's) is never booked to the panel.
+    const lead = `lead:${/^lead-(\d+)-/.exec(request.lead_ref)?.[1] ?? ""}`;
+    if (!outbox.hasRef(lead)) return { kind: "unqueued" };
+    const body = ingestBody(siteEvent("booking.requested@1", head({ brandId, leadId: request.lead_ref }), request));
+    const row = outbox.enqueueOnce(JSON.stringify(body), `booking:${request.lead_ref}`, lead);
+    return row === null ? { kind: "duplicate" } : { kind: "queued", row };
+  };
   return {
     outbox,
-    requestBooking(request) {
-      // The lead's own row, as `enqueue` refs it: the booking follows it, and
-      // a lead never queued (a honeypot's) is never booked to the panel.
-      const lead = `lead:${/^lead-(\d+)-/.exec(request.lead_ref)?.[1] ?? ""}`;
-      if (!outbox.hasRef(lead)) return { kind: "unqueued" };
-      const body = ingestBody(siteEvent("booking.requested@1", head({ brandId, leadId: request.lead_ref }), request));
-      const row = outbox.enqueueOnce(JSON.stringify(body), `booking:${request.lead_ref}`, lead);
-      return row === null ? { kind: "duplicate" } : { kind: "queued", row };
-    },
+    requestBooking,
     declareExperiments(experiments, summaries) {
       const { body, skipped } = experimentsDeclaredBody(experiments, { brandId, sourceId, at: new Date(now()), ...(summaries ? { summaries } : {}) });
       const row = outbox.enqueue(JSON.stringify(body), `experiments:${body.events.map(e => e.id).join(",")}`);
@@ -131,7 +134,14 @@ export function leadWebhook(site: { brand: { id: string } }, env: Pick<ServerEnv
       };
       const subject = { brandId, leadId: meta.leadRef, ...(lead.placeSlug !== null && isOpaqueId(lead.placeSlug) ? { locationId: lead.placeSlug } : {}) };
       const body = ingestBody(siteEvent("lead.created@1", head(subject), properties, piiOf(lead, needLabel)));
-      return outbox.enqueue(JSON.stringify(body), `lead:${id}`);
+      const row = outbox.enqueue(JSON.stringify(body), `lead:${id}`);
+      // A slot asked on the card's steps rides with the lead; booking follows a priced lead only, as `bookingRoute`'s.
+      const { preference } = lead;
+      if (preference && (lead.flow === "estimate" || lead.flow === "fixed")) {
+        const queued = requestBooking({ lead_ref: meta.leadRef, provider: "manual", ...(preference.date ? { preferred_date: preference.date } : {}), ...(preference.part ? { preferred_part: preference.part } : {}) });
+        if (queued.kind !== "queued") throw new Error(`lead ${id}: its booking.requested was ${queued.kind} right behind its own lead.created`);
+      }
+      return row;
     },
     tick: () => outbox.tick(),
     start: intervalMs => outbox.start(intervalMs),

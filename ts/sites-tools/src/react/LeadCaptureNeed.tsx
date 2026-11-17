@@ -21,9 +21,11 @@ export interface LeadNeedOption extends FormSelectOption {
   icon?: ReactNode;
   /** On a tile or card, on a phone (under `sm`): a shorter label; the select and assistive technology keep `label`. */
   shortLabel?: string | undefined;
+  /** On a tile or card: a line under the label. */
+  hint?: string | undefined;
 }
 
-type NeedPart = "field" | "label" | "control" | "need" | "needs" | "summary" | "icon";
+type NeedPart = "field" | "label" | "control" | "need" | "needs" | "summary" | "icon" | "optionHint" | "optionPrice";
 
 /** The need's tiles or cards: a list, or a grid of cards with an icon each. */
 export const needGrid = (display: LeadNeedDisplay) => (display === "cards" ? "grid grid-cols-2 gap-2 sm:grid-cols-3" : "grid grid-cols-1 gap-2 sm:grid-cols-2");
@@ -34,6 +36,8 @@ export interface NeedFieldProps {
   display: LeadNeedDisplay;
   name: string;
   needs: readonly LeadNeedOption[];
+  /** A `fixed` need's price, formatted, by need: drawn on its tile or card. */
+  prices: Readonly<Record<string, string>>;
   need: string | undefined;
   /** Showing the choice again after it was made for the visitor. */
   editing: boolean;
@@ -89,7 +93,7 @@ export function NeedField(props: NeedFieldProps) {
     <TileGroup
       name={name}
       legend={label}
-      options={needs.map(n => ({ value: n.value, label: n.label, shortLabel: n.shortLabel, ...(display === "cards" && n.icon !== undefined ? { icon: n.icon } : {}) }))}
+      options={needs.map(n => ({ value: n.value, label: n.label, shortLabel: n.shortLabel, hint: n.hint, aside: props.prices[n.value], ...(display === "cards" && n.icon !== undefined ? { icon: n.icon } : {}) }))}
       value={need}
       required
       requiredText={props.requiredText}
@@ -98,7 +102,7 @@ export function NeedField(props: NeedFieldProps) {
       enterPicks={props.enterPicks}
       onPick={onPick}
       onSelect={onSelect}
-      classNames={{ field: c?.field, legend: c?.label, grid: cn(needGrid(display), c?.needs), tile: cn(needTile(display), c?.need), icon: c?.icon }}
+      classNames={{ field: c?.field, legend: c?.label, grid: cn(needGrid(display), c?.needs), tile: cn(needTile(display), c?.need), icon: c?.icon, hint: c?.optionHint, aside: c?.optionPrice }}
     />
   );
 }

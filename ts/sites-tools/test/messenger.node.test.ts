@@ -8,6 +8,7 @@ import {
   contactOf,
   createAcceptLead,
   defineSite,
+  LEAD_SCHEMA_VERSION,
   LEAD_CAPTURE_MESSENGER_TEXT,
   MAX_MESSENGER_MESSAGE,
   MESSAGE_REF,
@@ -284,7 +285,7 @@ describe("the sqlite store and a messenger lead", () => {
   };
   const tmp = () => join(mkdtempSync(join(tmpdir(), "sites-tools-messenger-")), "leads.db");
 
-  it("brings a version 7 file to 8, its rows kept with no reference", async () => {
+  it("brings a version 7 file forward, its rows kept with no reference", async () => {
     const path = tmp();
     const old = new (sqlite().DatabaseSync)(path);
     old.exec(`CREATE TABLE leads (id INTEGER PRIMARY KEY AUTOINCREMENT, job TEXT NOT NULL, zip TEXT NOT NULL, mobile TEXT NOT NULL, at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -295,7 +296,7 @@ describe("the sqlite store and a messenger lead", () => {
     old.exec("PRAGMA user_version = 7");
     old.close();
     const store = openSqliteLeadStore(path);
-    expect(store.version()).toBe(8);
+    expect(store.version()).toBe(LEAD_SCHEMA_VERSION);
     const before = await store.findSubmission("00000000-0000-4000-8000-000000000001");
     expect(before?.lead).not.toHaveProperty("messageRef");
     expect(before?.lead.channel).toBe("form");

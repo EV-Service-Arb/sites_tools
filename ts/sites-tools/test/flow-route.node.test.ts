@@ -285,3 +285,54 @@ describe("the quote route, a retry racing the post it repeats", () => {
     expect(log.error).not.toHaveBeenCalled();
   });
 });
+
+describe("the quote route, a slot asked on the card's steps", () => {
+  // NOW is 2027-01-15 (UTC), the day the panel sees the lead arrive.
+  const SLOT = { preferred_date: "2027-01-15", preferred_part: "afternoon" };
+  const kinds = (sent: Sent[]) => sent.map(e => (e as unknown as { type: string }).type);
+  // A booking leaves once its lead was delivered: a second run of the outbox.
+  const delivered = async (bodies: () => Promise<Sent[]>) => (await bodies(), bodies());
+
+  it("keeps it with the lead, answers it, and sends booking.requested behind lead.created", async () => {
+    const { route, stored, bodies } = harness();
+    const res = await route(post({ job: "windows", ...SLOT, submission_id: sid(40) }));
+    expect(await res.json()).toEqual({ ok: true, location: "/fr/thanks", lead: leadRef(1, sid(40)), cents: 8900, slot: { date: "2027-01-15", part: "afternoon" } });
+    expect((await stored(sid(40)))?.preference).toEqual({ date: "2027-01-15", part: "afternoon" });
+    const sent = await delivered(bodies);
+    expect(kinds(sent)).toEqual(["lead.created", "booking.requested"]);
+    expect(sent[1]).toMatchObject({ subject: { leadId: leadRef(1, sid(40)) }, properties: { lead_ref: leadRef(1, sid(40)), provider: "manual", preferred_date: "2027-01-15", preferred_part: "afternoon" } });
+  });
+
+  it("takes the part alone, and the day alone, without a script too", async () => {
+    const { route, stored, bodies } = harness();
+    expect((await route(post({ job: "windows", preferred_part: "morning", submission_id: sid(41) }, false))).status).toBe(303);
+    await route(post({ job: "windows", preferred_date: "2027-01-16", submission_id: sid(42) }, false));
+    expect((await stored(sid(41)))?.preference).toEqual({ part: "morning" });
+    expect((await stored(sid(42)))?.preference).toEqual({ date: "2027-01-16" });
+    expect((await delivered(bodies)).filter(e => (e as unknown as { type: string }).type === "booking.requested")).toHaveLength(2);
+  });
+
+  it("takes the lead and drops a slot the contract refuses, saying so in the log only", async () => {
+    const { route, stored, bodies, log } = harness();
+    for (const [n, bad] of [
+      [43, { preferred_date: "2027-01-10" }],
+      [44, { preferred_date: "2027-02-30" }],
+      [45, { ...SLOT, preferred_part: "night" }],
+    ] as const) {
+      const res = await route(post({ job: "windows", ...bad, submission_id: sid(n) }));
+      const answer = (await res.json()) as Record<string, unknown>;
+      expect(answer).toMatchObject({ ok: true, cents: 8900 });
+      expect(answer).not.toHaveProperty("slot");
+      expect((await stored(sid(n)))?.preference).toBeUndefined();
+    }
+    expect(log.warn).toHaveBeenCalledTimes(3);
+    expect(kinds(await delivered(bodies))).toEqual(["lead.created", "lead.created", "lead.created"]);
+  });
+
+  it("keeps it for a quote, whose slot is set on the call: no booking.requested", async () => {
+    const { route, stored, bodies } = harness();
+    await route(post({ job: "deep", ...SLOT, submission_id: sid(46) }));
+    expect((await stored(sid(46)))?.preference).toEqual({ date: "2027-01-15", part: "afternoon" });
+    expect(kinds(await delivered(bodies))).toEqual(["lead.created"]);
+  });
+});

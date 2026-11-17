@@ -111,6 +111,7 @@ export {
   type MessengerChannel,
   type LeadExtra,
   type LeadPrice,
+  type SlotPreference,
   type LeadRejection,
   type LeadSchema,
   type LeadStore,

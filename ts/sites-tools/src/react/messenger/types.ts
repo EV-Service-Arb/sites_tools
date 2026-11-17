@@ -73,6 +73,8 @@ export interface MessengerKit {
   brand: string;
   text: LeadCaptureText;
   wire: LeadWire;
+  /** The locality is a street address (`locality.ask`): personal, so never in a message. */
+  address: boolean;
   needs: readonly LeadNeedOption[];
   /** The need on screen, by its label — for the message. */
   needLabel: string | null;

@@ -32,35 +32,6 @@ export interface EstimateQuestion {
    * «2» says nothing. Over `shortLabels`, then the label.
    */
   previewLabels?: Readonly<Record<string, string>> | undefined;
-  /**
-   * `steps` only: questions with the same number share a screen, in the
-   * need's order. It moves on by itself once every one is answered; until
-   * then a button does (`next`, else `text.stepNext`), and says what is missing.
-   */
-  step?: number | undefined;
-  /** The words of that button, from the first question of the screen ("Voir les prix"). */
-  next?: string | undefined;
-}
-
-/**
- * The screens an estimate's questions take in `steps`, in order: one each,
- * or those sharing a `step` number together, where the first of them stands.
- */
-export function screensOf(inputs: readonly string[], questions: EstimateQuestions | undefined): string[][] {
-  const out: string[][] = [];
-  const byStep = new Map<number, string[]>();
-  for (const id of inputs) {
-    const step = questions?.[id]?.step;
-    const shared = step === undefined ? undefined : byStep.get(step);
-    if (shared) {
-      shared.push(id);
-      continue;
-    }
-    const screen = [id];
-    if (step !== undefined) byStep.set(step, screen);
-    out.push(screen);
-  }
-  return out;
 }
 
 export type EstimateQuestions = Readonly<Record<string, EstimateQuestion>>;
