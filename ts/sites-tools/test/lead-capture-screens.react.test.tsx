@@ -1,5 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import type { ReactElement } from "react";
+import { hydrateRoot } from "react-dom/client";
 import { renderToString } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LEAD_CAPTURE_TEXT, leadErrorOf, type OpeningHours, type Place } from "../src/index";
@@ -201,6 +202,18 @@ describe("the slot, asked on the steps", () => {
     render(card({ place: { ...place, booking: { default: "cal_com", providers: { cal_com: { url: "https://cal.com/brand/vitres" } } } } }));
     through("today");
     expect(shown()).toEqual(["phone"]);
+  });
+
+  it("hydrates the days the server drew, in the place's calendar", async () => {
+    const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const container = document.createElement("div");
+    container.innerHTML = renderToString(card());
+    document.body.append(container);
+    const root = await act(async () => hydrateRoot(container, card()));
+    expect(errors).not.toHaveBeenCalled();
+    // 10:00 in Paris on Monday 5 October: today is the 5th wherever the browser is.
+    expect(form().querySelector("input[name=preferred_date]")).toHaveAttribute("value", "2026-10-05");
+    act(() => root.unmount());
   });
 
   it("is in the form without a script, every screen at once, nothing of it required", () => {
