@@ -50,10 +50,10 @@ inputs.sites_tools.url = "github:EV-Service-Arb/sites_tools?ref=@evinvest/sites-
 inputs.sites_tools.inputs.v_flakes.follows = "v_flakes";
 
 landing = sites_tools.lib.mkLanding {
-  pkgs, root, pname, sitePort, buildFiles,        # required
+  pkgs, v_flakes, root, pname, sitePort, buildFiles, # required
+  e2ePort,                                        # required: E2E_PORT, the build under test's
   connected,                                      # required: reads sites_panel, posts leads to the conductor
   prodEnv ? { },                                  # baked into the image (deploy/config.nix)
-  v_flakes ? null,                                # without it: no `container`
   nodejs ? pkgs.nodejs_22, nodeRuntime ? pkgs.nodejs-slim_22,
   budgetFile ? "tests/bundle_budget.txt", gatedRoute ? "/[locale]/[location]",
   requiredFiles ? [ ],                            # must be in the standalone output (OG fonts)
@@ -67,8 +67,8 @@ landing = sites_tools.lib.mkLanding {
   figmaFile ? null,                               # the Figma file `apps.figma` renders into
 };
 # → { site, bundleBudget, packages.{default,site,container}, containers,
-#     checks.{site,bundle-budget}, apps.{default,help,dev,test,accept-test,figma,size,container-smoke},
-#     devShell }
+#     checks.{site,bundle-budget}, js, particles.{e2e-typecheck,e2e,checks,container-smoke,npm-audit},
+#     apps.{default,help,dev,accept-test,figma,size,container-smoke}, devShell }
 ```
 
 - `site`: the hermetic `next build` from `package-lock.json` through
@@ -110,9 +110,13 @@ every budget was before, is a target. The ceiling rounds down to a whole
 byte. The overshoot is meant to be paid back; changing the target or the
 tolerance is a deliberate commit, with a reason, as raising the budget was.
 `checks.bundle-budget` applies the same rule (no annotation in the sandbox).
-- `apps.test` (tsc — the app, then `e2eConfig` as its own project with its own
-  `tsconfig.json` — lint, vitest, build, size, Playwright on the flake's
-  pinned browsers), `accept-test` (Linux only), `size`, `dev`, `help`.
+- `js` (v_flakes' module on the repo root: `js-typecheck`, `js-test`, `js-lint`)
+  and `particles`, the brand's checks for `v_flakes.github`'s `jobs` (`nix run
+  .#test`, errors.yml / warnings.yml): `e2e-typecheck` (`e2eConfig` as its own
+  project), `e2e` (build, then Playwright on the flake's pinned browsers; the
+  only one that builds, as two builds would share `.next`), `checks`,
+  `container-smoke`, `npm-audit`. `apps`: `accept-test` (Linux only), `size`,
+  `dev`, `help`.
 - `apps.figma`: the pages of the `@figma` suite (`defineFigmaSuite`, which
   `defineSectionSuite` calls) into Figma, as editable auto-layout frames —
   one per page (a section's URL without its `#`) and Playwright project,

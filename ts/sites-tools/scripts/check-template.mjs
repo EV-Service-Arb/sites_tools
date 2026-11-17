@@ -21,10 +21,10 @@
 //   and re-priced by the server (a changed price confirmed, never recorded
 //   silently), its success offering the place's booking — Cal.com loaded on
 //   the click only, or a call with a preference — and the prices page's form
-//   one question a screen. The runner is this
-//   package's `@playwright/test`, linked into `tests/e2e` as a brand's flake
-//   links its own; its browser must be installed (`npx playwright install
-//   chromium`). The section screenshots stay a brand's: their baselines are
+//   one question a screen. The runner is the flake's `@playwright/test` and
+//   browsers (PLAYWRIGHT_NODE_MODULES, PLAYWRIGHT_BROWSERS_PATH: `nix run
+//   .#test sites-tools-pack`), linked into `tests/e2e` as a brand's flake links
+//   it. The section screenshots stay a brand's: their baselines are
 //   Linux captures the template does not carry.
 // --registry: no tarballs — the template installs as it is, from npm; what a
 //   brand gets after a release.
@@ -157,14 +157,13 @@ async function smoke() {
 
 async function quoteFormE2e() {
   const e2eDir = join(dir, "tests/e2e");
-  mkdirSync(join(e2eDir, "node_modules/@playwright"), { recursive: true });
-  for (const pkg of ["@playwright/test", "playwright", "playwright-core"]) {
-    symlinkSync(join(pkgRoot, "node_modules", pkg), join(e2eDir, "node_modules", pkg), "dir");
-  }
+  const modules = process.env["PLAYWRIGHT_NODE_MODULES"];
+  if (!modules) throw new Error("--e2e: PLAYWRIGHT_NODE_MODULES is unset; `nix run .#test sites-tools-pack` sets it");
+  symlinkSync(modules, join(e2eDir, "node_modules"), "dir");
   run("npx", ["tsc", "--noEmit", "-p", "tests/e2e"]);
   const port = await freePort();
   const mock = await freePort();
-  run("node", [join(pkgRoot, "node_modules/@playwright/test/cli.js"), "test", "quote-form.spec.ts", "flows.spec.ts", "steps.spec.ts", "ab-switcher.spec.ts", "--reporter=line"], e2eDir, { E2E_PORT: String(port), E2E_MOCK_PORT: String(mock) });
+  run("node", [join(modules, "@playwright/test/cli.js"), "test", "quote-form.spec.ts", "flows.spec.ts", "steps.spec.ts", "ab-switcher.spec.ts", "--reporter=line"], e2eDir, { E2E_PORT: String(port), E2E_MOCK_PORT: String(mock) });
 }
 
 try {

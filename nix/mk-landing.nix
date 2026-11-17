@@ -1,20 +1,23 @@
 # `lib.mkLanding`: everything a landing's flake.nix shares, ported from the
 # aquafix flake — the hermetic `next build` from package-lock.json, the OCI
-# image, the bundle-budget check, the container smoke, the dev/test apps and
-# the dev shell. A brand's flake.nix (see ts/sites-tools/template/flake.nix):
+# image, the bundle-budget check, the container smoke, the checks as v_flakes
+# particles, the apps and the dev shell. A brand's flake.nix (see
+# ts/sites-tools/template/flake.nix):
 #
 #   landing = sites_tools.lib.mkLanding {
 #     inherit pkgs v_flakes;
 #     root = ./.;
-#     pname = "vifnet"; sitePort = "59082"; connected = true;
+#     pname = "vifnet"; sitePort = "59082"; e2ePort = "52827"; connected = true;
 #     buildFiles = [ "package.json" "package-lock.json" "app" "src" "assets"
 #                    "next.config.ts" "tsconfig.json" "postcss.config.mjs"
 #                    "proxy.ts" "instrumentation.ts" ];
 #     prodEnv = import ./deploy/config.nix { port = "59082"; };
 #     smoke = { page = "/fr"; og = "/og?l=paris"; quote = { location = "paris"; … }; };
 #   };
-#   packages = landing.packages; checks = landing.checks;
-#   apps = landing.apps; devShells.default = landing.devShell;
+#   packages = landing.packages; checks = landing.checks; apps = landing.apps;
+#   github = v_flakes.github { jobs.errors.augment = landing.js.particles.errors
+#     ++ (with landing.particles; [ e2e-typecheck e2e checks container-smoke ]); … };
+#   devShells.default = landing.devShell.overrideAttrs …;  # + `combine`'s, with landing.js
 #
 # The npm version of @evinvest/sites-tools and the sites_tools revision move
 # together: pin the flake to the tag `@evinvest/sites-tools-vX.Y.Z` of the version
@@ -31,8 +34,7 @@
   connected
 , # Secret-free prod env baked into the image (deploy/config.nix).
   prodEnv ? { }
-, # For the OCI image; without it there is no `container` package.
-  v_flakes ? null
+, v_flakes
 , # `node:sqlite` without a flag needs >= 22.13. The image gets the slim build:
   # the same node without npm.
   nodejs ? pkgs.nodejs_22
@@ -53,8 +55,10 @@
 , # Refuse a lockfile whose @evinvest/sites-tools is not this sites_tools revision's.
   # Off only for a flake that builds no landing.
   checkSitesToolsVersion ? true
-, # Playwright's config for `apps.test` / `apps.accept-test`.
+, # Playwright's config for the `e2e` particle, `apps.accept-test` and `apps.figma`.
   e2eConfig ? "tests/e2e"
+, # E2E_PORT: the build under test's, apart from `nix run .#dev`'s.
+  e2ePort
 , # Sources for lockfile entries the registry cannot serve yet — a `file:` or
   # vendored tarball of an unpublished @evinvest package — keyed like the
   # lock (`"node_modules/@evinvest/sites-tools" = ./vendor/sites-tools.tgz;`). They
@@ -158,7 +162,7 @@ let
 
   # ── the one hard gate ──────────────────────────────────────────────────
   # First-load JS of a place page against the brand's committed budget, on
-  # the hermetic build: `nix flake check` warns over the target and fails past
+  # the hermetic build: warns over the target and fails past
   # its tolerance (sites-tools' README, "The bundle budget"). This revision's own
   # copy of `sites-tools-size`, run from source with type stripping.
   sizeCli = ../ts/sites-tools/src/cli;
@@ -177,33 +181,40 @@ let
         ${sizeCmd site}
         touch "$out"
       '';
+  checks = {
+    inherit site;
+    bundle-budget = bundleBudget;
+  };
 
   # ── the image ──────────────────────────────────────────────────────────
   dataDir = if mounts == [ ] then "/tmp" else builtins.head mounts;
-  containerStd =
-    if v_flakes == null then
-      null
-    else
-      v_flakes.container.implement {
-        inherit pkgs pname;
-        containers."" = {
-          port = lib.toInt sitePort;
-          inherit mounts criticality;
-          sqlite = lib.optional (prodEnv ? LEADS_DB_PATH) prodEnv.LEADS_DB_PATH; # sites-tools' lead store; LEADS_DB_URL is remote
-          healthPath = "/health";
-          entrypoint = [
-            "${nodeRuntime}/bin/node"
-            "--max-old-space-size=${toString maxOldSpaceMiB}"
-            "--max-semi-space-size=2" # the young generation, Node's default sizes it for a server with RAM to spare
-            "${site}/server.js"
-          ];
-          workingDir = dataDir;
-          # glibc's per-thread arenas keep freed native memory resident
-          imageEnv = [ "HOME=${dataDir}" "MALLOC_ARENA_MAX=2" ] ++ lib.mapAttrsToList (n: v: "${n}=${v}") prodEnv;
-        };
-      };
+  containerStd = v_flakes.container.implement {
+    inherit pkgs pname;
+    containers."" = {
+      port = lib.toInt sitePort;
+      inherit mounts criticality;
+      sqlite = lib.optional (prodEnv ? LEADS_DB_PATH) prodEnv.LEADS_DB_PATH; # sites-tools' lead store; LEADS_DB_URL is remote
+      healthPath = "/health";
+      entrypoint = [
+        "${nodeRuntime}/bin/node"
+        "--max-old-space-size=${toString maxOldSpaceMiB}"
+        "--max-semi-space-size=2" # the young generation, Node's default sizes it for a server with RAM to spare
+        "${site}/server.js"
+      ];
+      workingDir = dataDir;
+      # glibc's per-thread arenas keep freed native memory resident
+      imageEnv = [ "HOME=${dataDir}" "MALLOC_ARENA_MAX=2" ] ++ lib.mapAttrsToList (n: v: "${n}=${v}") prodEnv;
+    };
+  };
 
-  # ── apps ───────────────────────────────────────────────────────────────
+  # ── apps and particles ─────────────────────────────────────────────────
+  js = v_flakes.js { inherit pkgs; packages = [ "." ]; node = nodejs; };
+  # The e2e specs' `@playwright/test` is the flake's, pinned with its browsers:
+  # the pin is what makes a screenshot render alike on every machine of one OS.
+  playwright = args: js.playwright ({ package = "."; config = e2eConfig; } // args);
+  e2eEnv.E2E_PORT = e2ePort;
+  cfg = lib.escapeShellArg e2eConfig;
+
   # Resolve the repo at run time (`git rev-parse`), never `root`: that is the
   # read-only store snapshot, where npm cannot write. `npm ci` wipes
   # node_modules, so it runs only when the lockfile moved.
@@ -215,21 +226,10 @@ let
       echo "$want" > "$stamp"
     fi
   '';
-  # The e2e specs' `@playwright/test` is the flake's, pinned with its browsers
-  # (the pin is what makes a screenshot render alike on every machine of one
-  # OS); linked where tsc and the config resolve it from.
-  linkPlaywright = ''
-    ln -sfn ${pkgs.playwright-test}/lib/node_modules ${lib.escapeShellArg e2eConfig}/node_modules
-  '';
-  playwrightEnv = {
-    PLAYWRIGHT_BROWSERS_PATH = "${pkgs.playwright-driver.browsers}";
-    PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1";
-  };
-  exportPlaywright = lib.concatStrings (lib.mapAttrsToList (n: v: "export ${n}=${lib.escapeShellArg v}\n") playwrightEnv);
 
-  app = name: drv: {
+  app = drv: {
     type = "app";
-    program = "${drv}/bin/${name}";
+    program = lib.getExe drv;
   };
 
   runDev = pkgs.writeShellApplication {
@@ -253,58 +253,30 @@ let
     '';
   };
 
-  runTest = pkgs.writeShellApplication {
-    name = "${pname}-test";
-    runtimeInputs = [ nodejs pkgs.git pkgs.coreutils pkgs.playwright-test ];
-    text = ''
-      cd "$(git rev-parse --show-toplevel)"
-      ${ensureDeps}
-      ${linkPlaywright}
-      ${exportPlaywright}
-      # The e2e specs are their own project (the root one excludes them: their
-      # `@playwright/test` is the flake's, linked above), so a second tsc.
-      echo "▶ tsc";    npm run -s typecheck && npx tsc --noEmit -p ${lib.escapeShellArg e2eConfig}
-      echo "▶ lint";   npm run -s lint
-      echo "▶ vitest"; npx vitest run
-      echo "▶ build";  npm run -s build >/dev/null
-      echo "▶ size";   ${sizeCmd "."}
-      echo "▶ playwright"
-      playwright test -c ${lib.escapeShellArg e2eConfig} "$@"
-    '';
-  };
-
   # Screenshot baselines are Linux's (CI's); a mac shoots different glyphs.
-  runAcceptTest = pkgs.writeShellApplication {
+  runAcceptTest = (playwright {
     name = "${pname}-accept-test";
-    runtimeInputs = [ nodejs pkgs.git pkgs.coreutils pkgs.playwright-test ];
-    text = ''
+    env = e2eEnv;
+    run = ''
       if [ "$(uname -s)" != Linux ]; then
         echo "✘ baselines are Linux's. Take them from CI instead." >&2
         exit 1
       fi
-      cd "$(git rev-parse --show-toplevel)"
-      ${ensureDeps}
-      ${linkPlaywright}
-      ${exportPlaywright}
       npm run -s build >/dev/null
       filter="''${1:-}"
-      playwright test -c ${lib.escapeShellArg e2eConfig} --update-snapshots=all ''${filter:+-g "$filter"}
+      exec playwright test -c ${cfg} --update-snapshots=all ''${filter:+-g "$filter"}
     '';
-  };
+  }).program;
 
   # The `@figma` frames (`defineFigmaSuite`, the sections' pages), by `@evinvest/figma-render`'s bin.
-  runFigma = pkgs.writeShellApplication {
+  runFigma = (playwright {
     name = "${pname}-figma";
-    runtimeInputs = [ nodejs pkgs.git pkgs.coreutils pkgs.playwright-test ];
-    text = ''
-      cd "$(git rev-parse --show-toplevel)"
-      { ${ensureDeps} } >&2 # stdout is `frames`' JSON, or the render's link
-      ${linkPlaywright}
-      ${exportPlaywright}
-      [ "''${1:-}" = frames ] || npm run -s build >/dev/null
-      exec node_modules/.bin/evinvest-figma-render "$@" -c ${lib.escapeShellArg e2eConfig}${lib.optionalString (figmaFile != null) " --file ${lib.escapeShellArg figmaFile}"}
+    env = e2eEnv;
+    run = ''
+      [ "''${1:-}" = frames ] || npm run -s build >/dev/null # stdout is `frames`' JSON, or the render's link
+      exec node_modules/.bin/evinvest-figma-render "$@" -c ${cfg}${lib.optionalString (figmaFile != null) " --file ${lib.escapeShellArg figmaFile}"}
     '';
-  };
+  }).program;
 
   quoteFields = lib.concatStringsSep "\n" (lib.mapAttrsToList (n: v: "${n}=${v}") (smoke.quote or { }));
   containerSmoke = pkgs.writeShellApplication {
@@ -334,57 +306,77 @@ let
     text = ''
       cat <<'EOF'
         nix run .#dev              next dev on ${sitePort}
-        nix run .#test             tsc, lint, vitest, build, size, playwright
+        nix run .#test             the checks (tsc, lint, vitest, playwright, the hermetic build + budget, the image's smoke, npm audit); `-- --help` lists them
         nix run .#accept-test      accept screenshot baselines (Linux only); `-- <name>` for a subset
         nix run .#figma            build, then every page at every breakpoint onto a new page of figmaFile (`-- --folder <url> --name <file>`: all of that file); `-- frames` lists them
         nix run .#size             build, then the first-load JS budget   [the one hard gate]
         nix run .#container-smoke  boot the image and hold it to its contract (Linux + docker)
         nix build                  the standalone server
         nix build .#container      the OCI image (Linux)
-        nix flake check            the hermetic build + the bundle budget against it
       EOF
     '';
   };
 in
 assert addressesOk;
 {
-  inherit site bundleBudget;
+  inherit site bundleBudget checks js;
 
   packages = {
     default = site;
     inherit site;
   }
-  // lib.optionalAttrs (containerStd != null) (
-    containerStd.packages // { container = containerStd.packages."${pname}-container"; }
-  );
+  // containerStd.packages // { container = containerStd.packages."${pname}-container"; };
 
   # After `implement`, which rejects keys it does not know.
-  containers = if containerStd == null then { } else lib.mapAttrs (_: c: c // { contract = c.contract // lib.optionalAttrs connected { inherit consumes; }; }) containerStd.containers;
+  containers = lib.mapAttrs (_: c: c // { contract = c.contract // lib.optionalAttrs connected { inherit consumes; }; }) containerStd.containers;
 
-  checks = {
-    inherit site;
-    bundle-budget = bundleBudget;
+  # By name: the brand's `v_flakes.github` lists each in its section, beside `js.particles`.
+  # Only `e2e` builds: two `next build`s at once would share `.next`.
+  particles = {
+    # the specs are their own project: their `@playwright/test` is the flake's
+    e2e-typecheck = playwright { name = "e2e-typecheck"; run = "exec npx tsc --noEmit -p ${cfg}"; };
+    e2e = playwright {
+      name = "e2e";
+      env = e2eEnv;
+      run = ''
+        npm run -s build
+        exec playwright test -c ${cfg} "$@"
+      '';
+    };
+    checks = { name = "checks"; builds = checks; };
+    container-smoke = { name = "container-smoke"; program = containerSmoke; };
+    npm-audit = {
+      name = "npm-audit";
+      program = pkgs.writeShellApplication {
+        name = "npm-audit";
+        runtimeInputs = [ nodejs pkgs.git ];
+        text = ''
+          cd "$(git rev-parse --show-toplevel)"
+          exec npm audit --omit=dev --audit-level=moderate
+        '';
+      };
+    };
   };
 
   apps = {
-    default = app "${pname}-help" help;
-    help = app "${pname}-help" help;
-    dev = app "${pname}-dev" runDev;
-    test = app "${pname}-test" runTest;
-    accept-test = app "${pname}-accept-test" runAcceptTest;
-    figma = app "${pname}-figma" runFigma;
-    size = app "${pname}-size" runSize;
-    container-smoke = app "${pname}-container-smoke" containerSmoke;
+    default = app help;
+    help = app help;
+    dev = app runDev;
+    accept-test = app runAcceptTest;
+    figma = app runFigma;
+    size = app runSize;
+    container-smoke = app containerSmoke;
   };
 
   devShell = pkgs.mkShell {
     packages = [
       nodejs
-      # runner + nixpkgs-pinned browsers; `apps.test` links it for tsc.
-      pkgs.playwright-test
+      pkgs.playwright-test # `playwright test` by hand, on the particles' browsers
       pkgs.sqlite # inspecting the lead store
     ];
-    env = playwrightEnv // {
+    env = e2eEnv // {
+      PLAYWRIGHT_BROWSERS_PATH = "${pkgs.playwright-driver.browsers}";
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1";
       PORT = sitePort;
       NEXT_TELEMETRY_DISABLED = "1";
     };

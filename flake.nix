@@ -18,9 +18,19 @@
 
           pre-commit-check = pre-commit-hooks.lib.${system}.run (v_flakes.files.preCommit { inherit pkgs; });
 
+          # `node:sqlite` without a flag needs >= 22.13 (the lead store); the brands' node
+          js = v_flakes.js { inherit pkgs; packages = [ "ts/*" ]; rootDir = ./.; node = pkgs.nodejs_22; };
+
           github = v_flakes.github {
             inherit pkgs pname;
             enable = true;
+            # not `inherit js`: a language module without `rs` makes the pre-commit install throw for want of a toolchain
+            jobs.errors.augment = js.particles.errors ++ [
+              sitesToolsPack
+              { name = "sites-tools-visual"; program = sites-tools-visual-app; }
+              { name = "checks"; builds = checks; }
+            ] ++ pkgs.lib.optional pkgs.stdenv.hostPlatform.isLinux (mkLandingFixture.particles.container-smoke // { name = "mk-landing-smoke"; });
+            jobs.warnings.augment = js.particles.warnings;
             gitignore.extra = ''
               ## Node / TypeScript
               **/node_modules
@@ -51,7 +61,7 @@
             badges = [ "msrv" ];
           };
 
-          combined = v_flakes.utils.combine { inherit rust; modules = [ github readme ]; };
+          combined = v_flakes.utils.combine { inherit rust; modules = [ github readme js ]; };
 
           # `nix run .#publish -- <major|minor|patch>`: bump `@evinvest/sites-tools`,
           # move the template onto it, tag; the pushed tag is what CI publishes.
@@ -69,6 +79,7 @@
             root = ./nix/mk-landing-fixture;
             pname = "mk-landing-fixture";
             sitePort = "59099";
+            e2ePort = "59098"; # it has no e2e
             connected = true;
             buildFiles = [ "package.json" "package-lock.json" "build.mjs" ];
             requiredFiles = [ "assets/fonts/Display.ttf" ];
@@ -89,6 +100,39 @@
             # A package the registry does not have (its `resolved` 404s), served
             # from a vendored tarball — how a brand builds before a release.
             packageSourceOverrides."node_modules/fixture-vendored" = ./nix/mk-landing-fixture/vendor/fixture-vendored-1.0.0.tgz;
+          };
+
+          # `ts/sites-tools` as it ships: the tarball's contents, then `template/` built against it as a
+          # brand would (`next build`, its tests, the budget, a live server, its e2e). One particle: both pack,
+          # and a pack rebuilds dist/.
+          sitesToolsPack = {
+            name = "sites-tools-pack";
+            program = pkgs.writeShellApplication {
+              name = "sites-tools-pack";
+              runtimeInputs = [ js.nodejs pkgs.git ];
+              runtimeEnv = {
+                PLAYWRIGHT_NODE_MODULES = "${pkgs.playwright-test}/lib/node_modules";
+                PLAYWRIGHT_BROWSERS_PATH = "${pkgs.playwright-driver.browsers}";
+                PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1";
+              };
+              text = ''
+                cd "$(git rev-parse --show-toplevel)/ts/sites-tools"
+                [ -d node_modules ] || npm ci
+                node scripts/verify-pack.mjs
+                exec node scripts/check-template.mjs --e2e
+              '';
+            };
+          };
+
+          # `lib.mkLanding` against a stand-in brand: the hermetic npm build from
+          # its lockfile, the standalone install checks, the size gate, and on
+          # Linux the image (its smoke is a particle).
+          checks = {
+            mk-landing-site = mkLandingFixture.checks.site;
+            mk-landing-budget = mkLandingFixture.checks.bundle-budget;
+          }
+          // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
+            mk-landing-container = mkLandingFixture.packages.container;
           };
 
           # ── Visual regression (ts/sites-tools/test/visual) ─────────────────────
@@ -186,10 +230,10 @@
 
               Commands:
                 nix develop                              dev shell (node, playwright, pre-commit)
+                nix run .#test [-- --help]               the checks (v_flakes particles), in parallel
                 nix run .#publish -- <major|minor|patch> bump + tag @evinvest/sites-tools (CI publishes the tag)
                 nix run .#sites-tools-visual [-- --update]  visual regression of the sites-tools widget gallery
                 nix run .#mk-landing-smoke               smoke the mk-landing fixture container (linux + docker)
-                nix build .#checks.<system>.mk-landing-budget   mk-landing bundle size gate
 
               Docs: README.md, docs/ARCHITECTURE.md, ts/sites-tools/README.md
               EOF
@@ -214,16 +258,7 @@
             }}/bin/visual-render";
           };
 
-          # `lib.mkLanding` against a stand-in brand: the hermetic npm build from
-          # its lockfile, the standalone install checks, the size gate, and on
-          # Linux the image and its smoke.
-          checks = {
-            mk-landing-site = mkLandingFixture.checks.site;
-            mk-landing-budget = mkLandingFixture.checks.bundle-budget;
-          }
-          // pkgs.lib.optionalAttrs pkgs.stdenv.isLinux {
-            mk-landing-container = mkLandingFixture.packages.container;
-          };
+          inherit checks;
 
           packages.mk-landing-fixture-container = mkLandingFixture.packages.container or mkLandingFixture.site;
           apps.mk-landing-smoke = mkLandingFixture.apps.container-smoke;
