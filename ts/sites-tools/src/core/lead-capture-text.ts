@@ -63,6 +63,8 @@ export interface LeadCaptureText extends Partial<LeadCaptureFlowText>, Partial<L
   namePlaceholder?: string | undefined;
   /** The submit of a priced need once its price is shown, `{price}` that price ("Réserver · prix fixe {price}"). None by default: `bookSubmit` stays. */
   bookSubmitPrice?: string | undefined;
+  /** In `steps`, the end of the answers once the need's price is shown, `{price}` that price ("{price} TTC"). None by default: the answers say no price. */
+  answersPrice?: string | undefined;
   /** After an optional field's label. */
   optional: string;
   submit: string;

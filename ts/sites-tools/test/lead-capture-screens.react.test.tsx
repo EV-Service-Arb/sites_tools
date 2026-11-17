@@ -52,7 +52,7 @@ function card(over: Partial<LeadCaptureProps> = {}): ReactElement {
       needs={NEEDS}
       flows={FLOWS}
       pricing={MODEL}
-      text={{ ...fr, bookSubmitPrice: "Réserver · prix fixe {price}" }}
+      text={{ ...fr, bookSubmitPrice: "Réserver · prix fixe {price}", answersPrice: "{price} TTC" }}
       layout="steps"
       needDisplay="cards"
       intro={WHEN}
@@ -131,7 +131,7 @@ describe("screens of several questions", () => {
     const order = [...form().querySelectorAll("[data-lead-step=phone] [data-lead-field]")].map(el => el.getAttribute("data-lead-field"));
     expect(order).toEqual(["name", "phone", "locality"]);
     expect(within(form()).getByRole("button", { name: /Réserver · prix fixe 89\s€/ })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Votre besoin · Quand \?, Vitres · Au plus vite/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /^Votre besoin · Quand \?, Vitres · Au plus vite · 89\s€ TTC Modifier$/ })).toBeTruthy();
   });
 
   it("asks a street address: the address autofill, letters, and nothing filled in for it", () => {
@@ -171,7 +171,9 @@ describe("the slot, asked on the steps", () => {
     next();
     expect(shown()).toEqual(["phone"]);
     expect(posted()).toMatchObject({ when: "today", preferred_date: "2026-10-05", preferred_part: "afternoon" });
-    expect(screen.getByRole("button", { name: /lun\. 5 · Après-midi/ })).toBeTruthy();
+    // One row: each answer a tap back to its screen, the price and one « Modifier » at its end.
+    expect(screen.getByRole("button", { name: /lun\. 5 · Après-midi · 89\s€ TTC Modifier$/ })).toBeTruthy();
+    expect(screen.getAllByText(fr.needChange)).toHaveLength(1);
   });
 
   it("later: the days start tomorrow, none chosen; another answer takes the slot away", () => {
