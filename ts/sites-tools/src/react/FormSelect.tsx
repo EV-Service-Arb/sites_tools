@@ -55,6 +55,8 @@ export interface FormSelectProps {
 }
 
 const BOX = "relative inline-flex w-full";
+// The kit's `NativeSelect` is sized to nest in a field; standing as one, it takes `SelectTrigger`'s box.
+const NATIVE_SIZE: Record<SelectTriggerSize, string> = { sm: "h-8", md: "h-9", lg: "h-12 pl-4" };
 
 /** The scripted state, in a chunk of its own (`FormSelectKit`). */
 const KIT = lazyPart(() => import("./FormSelectKit").then(m => m.FormSelectKit));
@@ -151,7 +153,7 @@ function FormSelectField({ hydrated, kit, ...props }: FormSelectProps & { hydrat
       // follow a change, and a pick made then must survive into the swap.
       defaultValue={state.value}
       wrapperClassName={cn(BOX, className)}
-      className={classNames?.trigger}
+      className={cn(NATIVE_SIZE[size], classNames?.trigger)}
       {...aria}
       {...live}
     >
