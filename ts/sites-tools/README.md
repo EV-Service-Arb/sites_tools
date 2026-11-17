@@ -46,7 +46,7 @@ brand's `flake.nix` is its own config plus one call — `template/flake.nix` is
 the whole of one:
 
 ```nix
-inputs.sites_tools.url = "github:EV-Service-Arb/sites_tools?ref=@evinvest/sites-tools-v0.33.1"; # the version in package-lock.json
+inputs.sites_tools.url = "github:EV-Service-Arb/sites_tools?ref=@evinvest/sites-tools-v0.34.0"; # the version in package-lock.json
 inputs.sites_tools.inputs.v_flakes.follows = "v_flakes";
 
 landing = sites_tools.lib.mkLanding {
