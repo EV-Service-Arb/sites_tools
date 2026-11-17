@@ -29,6 +29,8 @@ export interface LeadBookingProps {
   action?: string | undefined;
   /** For the `manual` day tiles; the click's clock by default. */
   now?: number | undefined;
+  /** Whose calendar the `manual` days are: the place's. */
+  timeZone: string;
   /**
    * The card's steps asked the slot (`LeadIntroOption.slot`): `manual` asks
    * nothing more, and says whether the lead came with one the server kept.
@@ -85,7 +87,7 @@ export function LeadBooking(props: LeadBookingProps) {
   // No reference to join a booking to, or a provider no adapter knows: the call is promised.
   if (sent.lead === undefined || (provider !== "manual" && (!proven || !adapter))) return <p className={cn("text-ink", c?.bookingNote)}>{text.slotCallback}</p>;
   if (provider === "manual" && props.slotAsked) return <p className={cn("text-ink", c?.bookingNote)}>{sent.slot ? text.preferSent : text.slotCallback}</p>;
-  if (provider === "manual") return <LeadBookingManual leadRef={sent.lead} locale={props.locale} now={props.now ?? Date.now()} text={text} report={proven ? report : null} classNames={c} />;
+  if (provider === "manual") return <LeadBookingManual leadRef={sent.lead} locale={props.locale} now={props.now ?? Date.now()} timeZone={props.timeZone} text={text} report={proven ? report : null} classNames={c} />;
   const ctx = { config: booking, leadRef: sent.lead, name: sent.name, phone: sent.phone, locale: props.locale };
   if (!adapter) return null;
   return <OpenBooking adapter={adapter} ctx={ctx} report={report} text={text} classNames={c} />;

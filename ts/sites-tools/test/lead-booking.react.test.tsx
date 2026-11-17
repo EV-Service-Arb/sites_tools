@@ -16,7 +16,7 @@ function stand(booking: OpenBookingConfig, over: { sent?: LeadSent; embed?: bool
   const sink: AnalyticsSink = { capture: (event, props) => void events.push({ event, props: { ...props } }) };
   const fetch = vi.fn(async (_url: string | URL | Request, _init?: RequestInit) => Response.json({ ok: true, queued: true }));
   vi.stubGlobal("fetch", fetch);
-  const ui: ReactElement = <LeadBooking booking={booking} sent={over.sent ?? SENT} locale="fr" text={text} now={NOW} embed={over.embed} adapters={over.adapters} slotAsked={over.slotAsked ?? false} />;
+  const ui: ReactElement = <LeadBooking booking={booking} sent={over.sent ?? SENT} locale="fr" text={text} now={NOW} embed={over.embed} adapters={over.adapters} timeZone="Europe/Paris" slotAsked={over.slotAsked ?? false} />;
   render(<AnalyticsSinkContext.Provider value={sink}>{ui}</AnalyticsSinkContext.Provider>);
   const posted = () => fetch.mock.calls.map(([url, init]) => ({ url: String(url), body: JSON.parse(String(init?.body)) as unknown }));
   return { events, fetch, posted };

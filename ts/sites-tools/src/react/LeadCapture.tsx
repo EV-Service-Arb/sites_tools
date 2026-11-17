@@ -9,6 +9,7 @@ import { fillText, formatCents, openingText } from "../core/lead-capture-format"
 import { channelsAvailable, MESSAGE_REF_FIELD, type MessengerFacts, type MessengerVariant } from "../core/messenger";
 import { flowTextOf, type LeadCaptureText } from "../core/lead-capture-text";
 import { bookingOf } from "../core/booking/model";
+import { DEFAULT_TIME_ZONE } from "../core/place/hours";
 import { servedLocalities, storefrontOf, type Place } from "../core/place/types";
 import { ESTIMATE_UNKNOWN, flowOf, type LeadFlows } from "../core/pricing/flow";
 import { priceOf, type DayPart, type PricingInput, type PricingModel } from "@evinvest/sites-contract";
@@ -341,7 +342,8 @@ export function LeadCapture(props: LeadCaptureProps) {
       : []),
   );
   const total = intro !== undefined && introValue === undefined ? null : longest;
-  const slotDayShown = slotDay ?? (chosen?.slot === "today" ? todayOf(now) : undefined);
+  const timeZone = props.timeZone ?? DEFAULT_TIME_ZONE;
+  const slotDayShown = slotDay ?? (chosen?.slot === "today" ? todayOf(now, timeZone) : undefined);
   const answeredQuestion = (question: string): boolean => {
     switch (question) {
       case "intro":
@@ -528,6 +530,7 @@ export function LeadCapture(props: LeadCaptureProps) {
         adapters={props.bookingAdapters}
         embed={props.bookingEmbed}
         formId={formId}
+        timeZone={timeZone}
         slotAsked={slotAsked}
         classNames={c}
       />
@@ -719,7 +722,7 @@ export function LeadCapture(props: LeadCaptureProps) {
         };
       case "slot": {
         const part = slotPart && { morning: flowText.partMorning, afternoon: flowText.partAfternoon, evening: flowText.partEvening }[slotPart];
-        const day = slotDayShown && new Intl.DateTimeFormat(locale, { weekday: "short", day: "numeric" }).format(new Date(`${slotDayShown}T12:00:00`));
+        const day = slotDayShown && new Intl.DateTimeFormat(locale, { weekday: "short", day: "numeric", timeZone: "UTC" }).format(new Date(`${slotDayShown}T12:00:00Z`));
         const answer = (set: () => void, radio: HTMLInputElement | null) => (radio ? moveOn(() => (set(), pin()), radio, false) : (set(), pin()));
         return {
           label: `${flowText.preferDay} · ${flowText.preferPart}`,
@@ -728,6 +731,7 @@ export function LeadCapture(props: LeadCaptureProps) {
             <SlotField
               key="slot"
               now={now}
+              timeZone={timeZone}
               from={chosen?.slot === "later" ? 1 : 0}
               locale={locale}
               text={flowText}
