@@ -49,6 +49,8 @@ export function LeadSteps(props: {
   total: number | null;
   onBack: () => void;
   onEdit: (id: StepId) => void;
+  /** Ends the answers: the need's price, in `answersPrice`'s words. */
+  price: string | null;
   text: { stepProgress: string; stepProgressOpen: string; stepBack: string; change: string };
   classNames?: PartClassNames<StepsPart> | undefined;
 }) {
@@ -74,15 +76,19 @@ export function LeadSteps(props: {
       </div>
       {answered.length > 0 && (
         <ul data-lead-chrome="" className={cn("flex flex-wrap gap-2", c?.answers)}>
-          {answered.map(s => (
-            <li key={s.id}>
-              <Button type="button" variant="outline" size="touch" className={cn("h-auto gap-2 px-3 text-sm", c?.answer)} onClick={() => props.onEdit(s.id)}>
-                <span className="sr-only">{`${s.label}, `}</span>
-                <span className="font-medium text-ink">{s.value}</span>
-                <span className="text-ink-soft underline underline-offset-4">{text.change}</span>
-              </Button>
-            </li>
-          ))}
+          {answered.map((s, i) => {
+            const last = i === answered.length - 1;
+            return (
+              <li key={s.id}>
+                <Button type="button" variant="outline" size="touch" className={cn("h-auto gap-2 px-3 text-sm", c?.answer)} onClick={() => props.onEdit(s.id)}>
+                  <span className="sr-only">{`${s.label}, `}</span>
+                  <span className="font-medium text-ink">{last && props.price !== null ? `${s.value} · ${props.price}` : s.value}</span>
+                  {/* One for the row: each answer is a tap back to its screen. */}
+                  {last && <span className="text-ink-soft underline underline-offset-4">{text.change}</span>}
+                </Button>
+              </li>
+            );
+          })}
         </ul>
       )}
       {steps.map(s => (

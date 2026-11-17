@@ -853,6 +853,7 @@ export function LeadCapture(props: LeadCaptureProps) {
             total={total}
             onBack={() => moveOn(stepper.back, null, false)}
             onEdit={step => moveOn(() => stepper.edit(step), null, false)}
+            price={text.answersPrice !== undefined && repriced.price ? fillText(text.answersPrice, { price: formatCents(repriced.price.cents, locale) }) : null}
             text={{ stepProgress: flowText.stepProgress, stepProgressOpen: flowText.stepProgressOpen, stepBack: flowText.stepBack, change: text.needChange }}
             classNames={c}
           />

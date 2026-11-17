@@ -278,7 +278,7 @@ it is the plain POST to `/quote` it always was.
 | `experiment` | `{ name, variant }`, slugs: on every event and posted with the form |
 | `timeZone` | `Europe/Paris` by default |
 | `formId`, `id` | `quote` · `quote`: the id is the card's (root), so `#quote` scrolls to the whole card, head included; the form is `<id>-form`, the callback `<id>-callback` (its form `<id>-callback-form`). Both forms post it as `card`, so a refused lead comes back to `#<id>` |
-| `text` | `LeadCaptureText`: `LEAD_CAPTURE_TEXT.fr` / `.en`, plain strings (`{need}`, `{day}`, `{time}` filled in); optional `localityPlaceholder`, `phonePlaceholder`, `namePlaceholder` and `bookSubmitPrice` — a priced need's submit once its price is shown, `{price}` that price ("Réserver · prix fixe {price}") — none by default. The errors are words of the page too: `phoneInvalid`, `required`, `needRequired`, `consentRequired`, `fieldInvalid`, `formInvalid`, and the post's `sending`, `networkError`, `timeoutError`, `retry` — a brand spreading `LEAD_CAPTURE_TEXT` has them |
+| `text` | `LeadCaptureText`: `LEAD_CAPTURE_TEXT.fr` / `.en`, plain strings (`{need}`, `{day}`, `{time}` filled in); optional `localityPlaceholder`, `phonePlaceholder`, `namePlaceholder` `bookSubmitPrice` — a priced need's submit once its price is shown, `{price}` that price ("Réserver · prix fixe {price}") — and `answersPrice` — in `steps`, the same price at the end of the answers ("{price} TTC") — none by default. The errors are words of the page too: `phoneInvalid`, `required`, `needRequired`, `consentRequired`, `fieldInvalid`, `formInvalid`, and the post's `sending`, `networkError`, `timeoutError`, `retry` — a brand spreading `LEAD_CAPTURE_TEXT` has them |
 | `labels` | `visible` (default) · `hidden`: every field's label `sr-only` — still the field's accessible name — for a design that draws placeholders |
 | `callbackOpen` | whether the callback starts open; by default only when it leads (the place is closed). `#<id>-callback` opens it either way |
 | `done` | the card after a lead is taken — a node, or `(sent: LeadSent) => node` (`{ channel, phone, name, fields, slot? }`: `fields` every field posted with a value, by name — the need, the intro's answer, the brand's extras; `slot` the preference the server kept), shown in place. Without it, a lead taken goes to the thanks page the route names. Either way a script posts the form itself (asking `/quote` for JSON), so a refusal keeps what was typed; an answer that is not the route's, or no network, submits the form for real; without a script nothing changes (303) |
@@ -559,8 +559,9 @@ import { messengerFacts } from "@evinvest/sites-tools";
   another on the phone's screen, is refused (it throws).
 - **Over the screens** a thin bar (`progress`; the screen is read out as
   `stepProgress`, "Étape 2/4", never drawn), "Retour" (`stepBack`), and the
-  screens answered as chips (`answers`, `answer`), each a tap back to its
-  screen with "Modifier" (`needChange`). The total counts the most screens
+  screens answered as one row of chips (`answers`, `answer`), each a tap
+  back to its screen, the last ending with the price (`answersPrice`) and
+  "Modifier" (`needChange`). The total counts the most screens
   an answer to come could add (the longest estimate while the need is
   open), so the bar only moves forward as the visitor answers; until the
   intro is answered — its branches differ in length — no total is said
