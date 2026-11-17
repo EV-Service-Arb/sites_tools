@@ -403,7 +403,8 @@ export function LeadCapture(props: LeadCaptureProps) {
   };
   // "I don't know", or an answer instead of it, changes which questions are asked.
   const answerPicked = (input: string, option: string, radio: HTMLInputElement) => {
-    if (steps && !tapMovesOn(input)) return moveOn(() => (estimate.answer(input, option), pin()), radio, false);
+    // "I don't know" drops the estimate's other questions: its screen may be left without them, and without its button.
+    if (steps && !tapMovesOn(input) && option !== ESTIMATE_UNKNOWN) return moveOn(() => (estimate.answer(input, option), pin()), radio, false);
     moveOn(() => (estimate.answer(input, option), steps && stepper.next()), radio, option !== ESTIMATE_UNKNOWN && estimate.answers[input] !== ESTIMATE_UNKNOWN);
   };
   /**

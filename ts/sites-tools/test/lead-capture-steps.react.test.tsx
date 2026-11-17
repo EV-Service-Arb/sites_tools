@@ -297,6 +297,14 @@ describe.each(ENGINES)("LeadCapture's steps, questions sharing a screen, tapped 
       expect(screen.getByRole("button", { name: /Chambres · Surface, 2 chambres · 40 à 70 m²/ })).toBeTruthy();
     });
 
+    it("asks nothing more after \"I don't know\", which leaves its screen one question: it moves on", () => {
+      render(capture({ need: "standard", questions: { ...questions, bedrooms: { unknown: true } }, screens }));
+      tap(radio("estimate_zone", "centre"));
+      tap(radio("estimate_bedrooms", ESTIMATE_UNKNOWN));
+      expect(form().querySelector("input[name=estimate_surface]")).toBeNull();
+      expect(shown()).toEqual(["locality"]);
+    });
+
     it("draws a short label on a phone, names the radio in full, and lets \"I don't know\" take two columns", () => {
       render(capture({ need: "standard", questions, screens, classNames: { estimateUnknown: "brand-unknown" } }));
       const s40 = radio("estimate_surface", "s40");

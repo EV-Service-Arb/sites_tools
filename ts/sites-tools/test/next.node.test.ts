@@ -413,7 +413,7 @@ describe("the OG route", () => {
     await og(new Request("https://aquafix.top/og?l=nowhere&lang=xx&p=nope"));
     expect(draw).toHaveBeenCalledTimes(2);
     expect(draw).toHaveBeenLastCalledWith({ locale: "fr", place: null, page: "home" });
-  });
+  }, 60_000); // the first render loads next/og's wasm renderer: seconds of CPU, more on a loaded machine
 });
 
 describe("health", () => {
