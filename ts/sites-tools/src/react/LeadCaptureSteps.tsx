@@ -7,7 +7,7 @@ import type { LeadIntro, StepId } from "./lead-steps";
 import { TileGroup } from "./LeadCaptureTiles";
 import type { PartClassNames } from "./parts";
 
-export type StepsPart = "progress" | "stepBack" | "step" | "answers" | "answer" | "intro" | "introOptions" | "introOption" | "optionHint" | "icon" | "label";
+export type StepsPart = "progress" | "stepBack" | "step" | "answers" | "answer" | "answerValue" | "answerChange" | "intro" | "introOptions" | "introOption" | "optionHint" | "icon" | "label";
 
 /** One screen: what it asks (the chip's label), what was answered (`null` while open), and the screen. */
 export interface StepView {
@@ -82,9 +82,9 @@ export function LeadSteps(props: {
               <li key={s.id}>
                 <Button type="button" variant="outline" size="touch" className={cn("h-auto gap-2 px-3 text-sm", c?.answer)} onClick={() => props.onEdit(s.id)}>
                   <span className="sr-only">{`${s.label}, `}</span>
-                  <span className="font-medium text-ink">{last && props.price !== null ? `${s.value} · ${props.price}` : s.value}</span>
+                  <span className={cn("font-medium text-ink", c?.answerValue)}>{last && props.price !== null ? `${s.value} · ${props.price}` : s.value}</span>
                   {/* One for the row: each answer is a tap back to its screen. */}
-                  {last && <span className="text-ink-soft underline underline-offset-4">{text.change}</span>}
+                  {last && <span className={cn("text-ink-soft underline underline-offset-4", c?.answerChange)}>{text.change}</span>}
                 </Button>
               </li>
             );
