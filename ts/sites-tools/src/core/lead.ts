@@ -11,7 +11,7 @@
  */
 
 import { MESSAGE_REF_FIELD, messageRefOf } from "./messenger";
-import { normalizePhone, phoneProblem, SITE_CHANNELS, type LeadFlow, type LeadSuspect, type PricingInputs, type SiteChannel } from "@evinvest/sites-contract";
+import { normalizePhone, phoneProblem, SITE_CHANNELS, type DayPart, type LeadFlow, type LeadSuspect, type PricingInputs, type SiteChannel } from "@evinvest/sites-contract";
 import type { LeadFlows } from "./pricing/flow";
 
 /** Why a submission was kept but not acted on. `null` is a clean lead. */
@@ -265,6 +265,18 @@ export interface Lead {
    * when its success sends the visitor on to a messenger. Not personal data.
    */
   messageRef?: string;
+  /**
+   * The slot the visitor prefers, asked on the card's steps before the
+   * contact (`slot`): `booking.requested@1`'s day and part of the day, as the
+   * contract checks them. Absent when not asked, not answered, or refused.
+   */
+  preference?: SlotPreference;
+}
+
+/** A visitor's preferred slot: a day (`YYYY-MM-DD`), a part of the day, or both. */
+export interface SlotPreference {
+  date?: string;
+  part?: DayPart;
 }
 
 /**
@@ -299,7 +311,7 @@ export function channelOf(lead: Pick<Lead, "channel">): SiteChannel {
  * What the form posted, before the funnel judges it: the consent is the
  * posted sentence, and the funnel stamps when it accepted it.
  */
-export type LeadCandidate = Omit<Lead, "spamVerdict" | "consent" | "flow" | "price"> & { consentText?: string };
+export type LeadCandidate = Omit<Lead, "spamVerdict" | "consent" | "flow" | "price" | "preference"> & { consentText?: string };
 
 /**
  * The port the funnel writes through — the commit point. `insert` resolves
@@ -332,9 +344,10 @@ export interface LeadStore {
  * table (`job`, `zip`, `mobile`, `at`), 2 + the place, 3 + the spam verdict,
  * 4 + the brand's extras, 5 + the channel and the callback's consent, 6 + the
  * script's submission id, unique, 7 + the flow and the price it was taken at,
- * 8 + the messenger reference (`message_ref`). Append only.
+ * 8 + the messenger reference (`message_ref`), 9 + the slot preference
+ * (`preferred_date`, `preferred_part`). Append only.
  */
-export const LEAD_SCHEMA_VERSION = 8;
+export const LEAD_SCHEMA_VERSION = 9;
 
 /** A field is capped, not rejected: a long answer is still a customer. */
 export const MAX_FIELD = 200;

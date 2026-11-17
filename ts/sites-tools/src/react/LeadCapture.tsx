@@ -10,23 +10,23 @@ import { channelsAvailable, MESSAGE_REF_FIELD, type MessengerFacts, type Messeng
 import { flowTextOf, type LeadCaptureText } from "../core/lead-capture-text";
 import { bookingOf } from "../core/booking/model";
 import { servedLocalities, storefrontOf, type Place } from "../core/place/types";
-import { ESTIMATE_UNKNOWN, estimateField, flowOf, type LeadFlows } from "../core/pricing/flow";
-import type { PricingInput, PricingModel } from "@evinvest/sites-contract";
+import { ESTIMATE_UNKNOWN, flowOf, type LeadFlows } from "../core/pricing/flow";
+import { priceOf, type DayPart, type PricingInput, type PricingModel } from "@evinvest/sites-contract";
 import { labelOf } from "../core/pricing/label";
 import type { BookingAdapters } from "./booking-adapters";
 import { focusNext } from "./focus-next";
 import { LeadBooking } from "./LeadBooking";
-import type { BookingPart } from "./LeadBookingManual";
+import { SlotField, todayOf, type BookingPart } from "./LeadBookingManual";
 import { LeadCapturePriced, type PricedPart } from "./LeadCapturePriced";
 import { CallbackForm, ChannelLink, ExperimentFields, PhotosAsk, type ChannelIconKey, type ChannelPart, type Experiment } from "./LeadCaptureChannels";
-import { askedInputs, EstimateInputs, EstimateQuestionField, estimatePlan, screensOf, useEstimate, type EstimatePart, type EstimateQuestions } from "./LeadCaptureEstimate";
+import { askedInputs, EstimateInputs, EstimateQuestionField, estimatePlan, useEstimate, type EstimatePart, type EstimateQuestions } from "./LeadCaptureEstimate";
 import { ConsentField, FormMessage, LocalityField, NameField, PhoneField, type FieldPart } from "./LeadCaptureFields";
 import { NeedField, type LeadCaptureLayout, type LeadNeedDisplay, type LeadNeedOption } from "./LeadCaptureNeed";
 import { PriceBox, PriceCompact, type PricePart } from "./LeadCapturePrice";
 import { IntroField, LeadSteps, type StepsPart, type StepView } from "./LeadCaptureSteps";
 import { drawsAt, initialMode, MessengerSlot, messengerShownOf, NO_MESSENGERS, useMessageRef } from "./LeadCaptureMessenger";
 import type { MessengerAt, MessengerKit, MessengerPart, PhoneOptions } from "./messenger/types";
-import { stepOfField, stepsOf, useLeadSteps, type LeadIntro, type StepId } from "./lead-steps";
+import { screensOf, stepOfField, useLeadSteps, type LeadIntro, type LeadScreen, type Screen, type StepId } from "./lead-steps";
 import type { PartClassNames } from "./parts";
 import { QuoteFormShell } from "./QuoteFormShell";
 import { useHeld, useHydrated, useNeed, useNow, useOpenOnHash, usePostcode } from "./use-lead-context";
@@ -39,7 +39,7 @@ import { useRepriced } from "./use-repriced";
 
 export type LeadCapturePart =
   | "root" | "head" | "title" | "lede" | "form" | "contact" | "submit" | "trust" | "privacy" | "opening" | "others" | "done"
-  | "needs" | "need" | "summary" | "icon" | "intro" | "introOption" | "stepNext"
+  | "needs" | "need" | "summary" | "icon" | "optionHint" | "intro" | "introOptions" | "introOption" | "stepNext"
   | FieldPart | ChannelPart | EstimatePart | PricePart | StepsPart | PricedPart | BookingPart | MessengerPart;
 
 export interface LeadCaptureProps {
@@ -75,10 +75,11 @@ export interface LeadCaptureProps {
   /**
    * After a priced lead: how the slot is set. By default the place's booking
    * (`place.booking`, `manual` when it has none) for `bookingVariant`,
-   * through its provider's adapter — `LeadBooking`. A node here replaces it
-   * whole.
+   * through its provider's adapter. A node here replaces it whole (`null`:
+   * nothing); a function is handed the kit's booking for that lead too, to
+   * keep it or not.
    */
-  booking?: ReactNode | ((sent: LeadSent) => ReactNode);
+  booking?: ReactNode | ((sent: LeadSent, kit: ReactNode) => ReactNode);
   /**
    * The built-in booking adapters with the brand's own over them, by
    * provider — from a client component only: a server one cannot pass functions.
@@ -103,13 +104,19 @@ export interface LeadCaptureProps {
   /** How the need is asked: `select` (default on one screen), `tiles` (default otherwise), `cards` with the `icon` of each need. */
   needDisplay?: LeadNeedDisplay | undefined;
   /**
-   * `steps` only: a question before the need whose answer is posted as one of
-   * the brand's extras (`field`) and may change the channel — `callback`:
-   * the rest is the phone and its consent, posted as a callback.
+   * `steps` only: a question whose answer is posted as one of the brand's
+   * extras (`field`) and may change what follows — `callback`: the rest is
+   * the phone and its consent, posted as a callback; `slot`: the slot the
+   * visitor prefers is asked before the contact.
    */
   intro?: LeadIntro | undefined;
-  /** `steps` only: the postcode on a screen of its own (default), or on the phone's. */
-  localityStep?: "own" | "with-phone" | undefined;
+  /**
+   * `steps` only: the screens, as the brand groups the questions — each its
+   * questions in order, its heading and its button's words. A question on
+   * none has a screen of its own: the intro, the need, each of the
+   * estimate's, the slot, the postcode, then the phone with the name.
+   */
+  screens?: readonly LeadScreen[] | undefined;
   /**
    * After a choice (the need, an estimate's answer) the focus moves to the
    * next empty field, and Enter in a field moves to the next empty one before
@@ -122,7 +129,8 @@ export interface LeadCaptureProps {
   price?: "box" | "compact" | undefined;
   /** `price="compact"`: the share of the price a tax credit gives back (0.5 for half), shown as what is left to pay. */
   taxCredit?: number | undefined;
-  locality?: "required" | "optional" | undefined;
+  /** What "where" asks: a postcode (default) or a street address; required unless `optional`. */
+  locality?: { ask: "postcode" | "address"; optional?: true } | undefined;
   /** A name field, posted as the brand's extra `field`. Off by default: every field costs leads. */
   name?: { field: string; required?: boolean } | undefined;
   /** The brand's extra fields, after the phone — never before it. */
@@ -225,13 +233,25 @@ export function LeadCapture(props: LeadCaptureProps) {
   const hydrated = useHydrated();
   const [editing, setEditing] = useState(false);
   const [need, setNeed] = useNeed(props.need, needs.map(n => n.value), () => setEditing(false));
-  const [introValue, setIntro] = useState<string | undefined>(undefined);
+  const [introValue, setIntroValue] = useState<string | undefined>(undefined);
   const intro = steps ? props.intro : undefined;
-  const callbackPreset = intro?.options.find(o => o.value === introValue)?.channel === "callback";
-  const served = localitySuggestions(place);
-  const postcode = usePostcode();
-  const [locality, setLocality] = useState<string | undefined>(undefined);
-  const localityShown = locality ?? postcode ?? (served.length === 1 ? served[0] : undefined);
+  const chosen = intro?.options.find(o => o.value === introValue);
+  const callbackPreset = chosen?.channel === "callback";
+  const address = props.locality?.ask === "address";
+  // A commune or the query's postcode is not an address: nothing is filled in for one.
+  const served = address ? [] : localitySuggestions(place);
+  const query = usePostcode();
+  const postcode = address ? undefined : query;
+  // What a typed field held when its screen was left ("Continuer"): the screen is answered.
+  const [typed, setTyped] = useState<{ locality?: string; name?: string }>({});
+  const localityShown = typed.locality ?? postcode ?? (served.length === 1 ? served[0] : undefined);
+  const [slotDay, setSlotDay] = useState<string | undefined>(undefined);
+  const [slotPart, setSlotPart] = useState<DayPart | undefined>(undefined);
+  // Another answer to the intro is another range of days: the day chosen goes with the old one.
+  const setIntro = (value: string) => {
+    if (value !== introValue) setSlotDay(undefined);
+    setIntroValue(value);
+  };
   const facts = props.messengers ?? NO_MESSENGERS;
   const shown = messengerShownOf(props.messenger, facts);
   const channels = channelsAvailable(props.messengers);
@@ -250,6 +270,14 @@ export function LeadCapture(props: LeadCaptureProps) {
   const estimate = useEstimate(model, shownNeed, wanted, events.estimateShown);
   const flow = estimate.flow;
   const repriced = useRepriced(estimate.price, shownNeed, flowText, locale);
+  // A `fixed` need's one price, on its tile: what `priceOf` makes of it, as the server will.
+  const prices: Record<string, string> = {};
+  for (const n of needs) {
+    if (!model || flowOf(props.flows, model, n.value) !== "fixed") continue;
+    const price = priceOf(model, n.value, {});
+    if (!price) throw new Error(`LeadCapture: ${n.value} runs fixed on a price list that does not price it`);
+    prices[n.value] = formatCents(price.cents, locale);
+  }
   // A priced lead stays in the card: its price is confirmed there, and the slot promised.
   // `thanks` offers its messengers in the success: the card stays.
   const staysInCard = (ch: "form" | "callback") => props.done !== undefined || (ch === "form" && (flow !== "quote" || shown === "thanks"));
@@ -287,22 +315,65 @@ export function LeadCapture(props: LeadCaptureProps) {
   const callbackElsewhere = !callbackPreset;
 
   const asked = model && shownNeed !== undefined && wanted === "estimate" ? askedInputs(model, shownNeed, estimate.answers) : [];
-  const screens = screensOf(asked.map(i => i.id), props.questions);
-  const stepIds = steps ? stepsOf({ intro: intro !== undefined, callback: callbackPreset, estimate: screens, localityOwn: props.localityStep !== "with-phone" }) : [];
-  const screenOf = (step: StepId) => screens.find(screen => screen[0] !== undefined && estimateField(screen[0]) === step) ?? [];
+  const bookingChoice = bookingOf(place, props.bookingVariant);
+  // The steps ask the slot when an intro answer may: before it is answered, for whichever it will be.
+  const slotAsked = intro?.options.some(o => o.slot !== undefined) === true;
+  const slotOn =
+    slotAsked &&
+    !callbackPreset &&
+    bookingChoice.provider === "manual" &&
+    (chosen === undefined || chosen.slot !== undefined) &&
+    (shownNeed === undefined ? needs.some(n => flowOf(props.flows, model, n.value) !== "quote") : flow !== "quote");
+  /** The questions asked now, in the kit's order; a callback asked for in the intro is the phone alone. */
+  const questionsOf = (estimateIds: readonly string[]): string[] =>
+    callbackPreset
+      ? [...(intro ? ["intro"] : []), "phone"]
+      : [...(intro ? ["intro"] : []), "need", ...estimateIds, ...(slotOn ? ["slot"] : []), "locality", "phone", ...(props.name ? ["name"] : [])];
+  const screens: readonly Screen[] = steps ? screensOf(props.screens, questionsOf(asked.map(i => i.id))) : [];
+  const stepIds = screens.map(s => s.id);
+  const screenOf = (step: StepId) => screens.find(s => s.id === step);
   // The bar counts the most screens an answer to come could add — the need's
   // longest estimate — so it never moves back; until the intro picks its branch, no total is said.
-  const longest = Math.max(0, ...needs.map(n => (model && flowOf(props.flows, model, n.value) === "estimate" ? screensOf(estimatePlan(model, n.value), props.questions).length : 0)));
-  const total = intro !== undefined && introValue === undefined ? null : stepIds.length + (need === undefined && !callbackPreset ? longest : 0);
-  const answered = (step: StepId) =>
-    step === "intro" ? introValue !== undefined : step === "need" ? need !== undefined : step === "locality" ? localityShown !== undefined : step === "phone" ? false : screenOf(step).every(id => estimate.answers[id] !== undefined);
-  const stepper = useLeadSteps(stepIds, answered, steps && formError !== null ? stepOfField(stepIds, formError, screens) : null, events.step);
+  const longest = Math.max(
+    stepIds.length,
+    ...(need === undefined && !callbackPreset
+      ? needs.map(n => screensOf(props.screens, questionsOf(model && flowOf(props.flows, model, n.value) === "estimate" ? estimatePlan(model, n.value) : [])).length)
+      : []),
+  );
+  const total = intro !== undefined && introValue === undefined ? null : longest;
+  const slotDayShown = slotDay ?? (chosen?.slot === "today" ? todayOf(now) : undefined);
+  const answeredQuestion = (question: string): boolean => {
+    switch (question) {
+      case "intro":
+        return introValue !== undefined;
+      case "need":
+        return need !== undefined;
+      case "slot":
+        return slotDayShown !== undefined && slotPart !== undefined;
+      case "locality":
+        return localityShown !== undefined;
+      case "name":
+        return typed.name !== undefined;
+      case "phone":
+        return false;
+      default:
+        return estimate.answers[question] !== undefined;
+    }
+  };
+  const answered = (step: StepId) => screenOf(step)?.ask.every(answeredQuestion) ?? false;
+  const stepper = useLeadSteps(stepIds, answered, steps && formError !== null ? stepOfField(screens, formError, intro?.field) : null, events.step);
   const { moveOn, focusAfterSelect } = useLeadFocus(formRef, { steps, focusNext: props.focusNext === true, current: stepper.current });
+  // A screen of one tile question moves on with the tap; any other with its button, so its answers can be changed first.
+  const tapMovesOn = (question: string) => {
+    const screen = screens.find(s => s.ask.includes(question));
+    return screen !== undefined && screen.ask.length === 1 && !["slot", "locality", "name", "phone"].includes(question);
+  };
+  const pin = () => stepper.edit(stepper.current);
 
   const pick = (value: string, from: HTMLElement | null) => {
     // A need that brings an estimate's questions brings screens React has yet to draw.
     const brings = flowOf(props.flows, model, value) === "estimate";
-    if (steps) return moveOn(() => (setNeed(value), stepper.next()), from, !brings && asked.length === 0);
+    if (steps) return tapMovesOn("need") ? moveOn(() => (setNeed(value), stepper.next()), from, !brings && asked.length === 0) : moveOn(() => (setNeed(value), pin()), from, false);
     if (layout === "single") {
       if (from === null) {
         setNeed(value);
@@ -329,32 +400,32 @@ export function LeadCapture(props: LeadCaptureProps) {
     setEditing(true);
   };
   // "I don't know", or an answer instead of it, changes which questions are asked.
-  // On a screen shared by a few questions, the last one answered moves on; until then the screen stays.
   const answerPicked = (input: string, option: string, radio: HTMLInputElement) => {
-    const screen = steps ? screenOf(stepper.current) : [];
-    const complete = screen.every(id => id === input || option === ESTIMATE_UNKNOWN || estimate.answers[id] !== undefined);
-    moveOn(() => (estimate.answer(input, option), steps && (complete ? stepper.next() : stepper.edit(stepper.current))), radio, option !== ESTIMATE_UNKNOWN && estimate.answers[input] !== ESTIMATE_UNKNOWN);
+    if (steps && !tapMovesOn(input)) return moveOn(() => (estimate.answer(input, option), pin()), radio, false);
+    moveOn(() => (estimate.answer(input, option), steps && stepper.next()), radio, option !== ESTIMATE_UNKNOWN && estimate.answers[input] !== ESTIMATE_UNKNOWN);
   };
-  /** A shared screen's button: on when every question is answered, else the first one unanswered says so. */
-  const continueScreen = (screen: readonly string[]) => {
-    const missing = screen.find(id => estimate.answers[id] === undefined);
-    const radio = missing === undefined ? null : formRef()?.querySelector<HTMLInputElement>(`input[name="${estimateField(missing)}"]`);
-    if (radio) return void radio.reportValidity();
-    moveOn(stepper.next, null, false);
-  };
-  const continueLocality = () => {
-    const el = formRef()?.querySelector<HTMLInputElement>('[data-lead-step="locality"] [data-lead-field="locality"]');
-    if (!el?.reportValidity()) return;
-    moveOn(() => (setLocality(el.value.trim()), stepper.next()), el, true);
+  /**
+   * A screen's button: the first of its fields the browser refuses says why
+   * (a question unanswered, a field empty); else what was typed is kept and
+   * the next screen comes on — its typed field focused inside the tap.
+   */
+  const continueScreen = () => {
+    const step = formRef()?.querySelector<HTMLElement>(`[data-lead-step="${CSS.escape(stepper.current)}"]`);
+    if (!step) return;
+    const invalid = [...step.querySelectorAll<HTMLInputElement>("input[data-lead-field]")].find(el => !el.checkValidity());
+    if (invalid) return void invalid.reportValidity();
+    const value = (question: "locality" | "name") => step.querySelector<HTMLInputElement>(`[data-lead-field="${question}"]`)?.value.trim();
+    const kept = { locality: value("locality"), name: value("name") };
+    moveOn(() => (setTyped(t => ({ ...t, ...Object.fromEntries(Object.entries(kept).filter(e => e[1] !== undefined)) })), stepper.next()), step, true);
   };
   // Enter in a typed field: the next empty field, or the next screen, before the submit.
   const onKeyDown = (e: KeyboardEvent<HTMLFormElement>) => {
     const field = e.target;
     if (e.key !== "Enter" || !(steps || props.focusNext) || !(field instanceof HTMLInputElement) || ["radio", "checkbox", "submit", "button"].includes(field.type)) return;
     if (focusNext(e.currentTarget, field)) e.preventDefault();
-    else if (steps && stepper.current === "locality") {
+    else if (steps && stepper.current !== "phone") {
       e.preventDefault();
-      continueLocality();
+      continueScreen();
     }
   };
 
@@ -416,6 +487,7 @@ export function LeadCapture(props: LeadCaptureProps) {
     brand: props.brand ?? "",
     text,
     wire,
+    address,
     needs,
     needLabel: needs.find(n => n.value === shownNeed)?.label ?? null,
     priceText: flow !== "quote" && repriced.price ? formatCents(repriced.price.cents, locale) : null,
@@ -446,6 +518,22 @@ export function LeadCapture(props: LeadCaptureProps) {
     "data-variant": experiment?.variant,
     "data-channels-available": channels,
   };
+  function bookingFor(sent: LeadSent): ReactNode {
+    const kit = (
+      <LeadBooking
+        booking={bookingChoice}
+        sent={sent}
+        locale={locale}
+        text={flowText}
+        adapters={props.bookingAdapters}
+        embed={props.bookingEmbed}
+        formId={formId}
+        slotAsked={slotAsked}
+        classNames={c}
+      />
+    );
+    return props.booking === undefined ? kit : typeof props.booking === "function" ? props.booking(sent, kit) : props.booking;
+  }
   if (sent && staysInCard(sent.channel)) {
     const done = typeof props.done === "function" ? props.done(sent) : props.done;
     return (
@@ -453,21 +541,7 @@ export function LeadCapture(props: LeadCaptureProps) {
         <div ref={doneRef} role="status" tabIndex={-1} className={cn("flex flex-col gap-4 outline-none", c?.done)}>
           <Fragment key="done">{done}</Fragment>
           {sent.channel === "form" && flow !== "quote" && (
-            <LeadCapturePriced
-              sent={sent}
-              booking={
-                props.booking === undefined ? (
-                  <LeadBooking booking={bookingOf(place, props.bookingVariant)} sent={sent} locale={locale} text={flowText} adapters={props.bookingAdapters} embed={props.bookingEmbed} formId={formId} classNames={c} />
-                ) : typeof props.booking === "function" ? (
-                  props.booking(sent)
-                ) : (
-                  props.booking
-                )
-              }
-              locale={locale}
-              text={flowText}
-              classNames={c}
-            />
+            <LeadCapturePriced sent={sent} booking={bookingFor(sent)} locale={locale} text={flowText} classNames={c} />
           )}
           {sent.channel === "form" && slot("done")}
         </div>
@@ -500,12 +574,13 @@ export function LeadCapture(props: LeadCaptureProps) {
       servedLabel={text.servedLabel}
       served={served}
       placeholder={text.localityPlaceholder}
-      required={props.locality !== "optional"}
+      required={props.locality?.optional !== true}
       optional={text.optional}
       requiredText={text.required}
       error={at("locality")}
       hydrated={hydrated}
       preset={postcode}
+      address={address}
       classNames={c}
     />
   );
@@ -543,13 +618,14 @@ export function LeadCapture(props: LeadCaptureProps) {
       classNames={c}
     />
   );
+  const bookSubmit = text.bookSubmitPrice !== undefined && repriced.price ? fillText(text.bookSubmitPrice, { price: formatCents(repriced.price.cents, locale) }) : flowText.bookSubmit;
   const mainBusy = busy === "form" || (callbackPreset && busy === "callback");
   const mainFailure = failure && (failure.channel === "form" || callbackPreset) ? failure.failure : null;
   function submitOf(label?: string, o: { form?: string; className?: string; icon?: ReactNode } = {}) {
     return (
       <SubmitButton
         busy={mainBusy}
-        label={label ?? (callbackPreset ? text.callbackSubmit : flow === "quote" ? text.submit : flowText.bookSubmit)}
+        label={label ?? (callbackPreset ? text.callbackSubmit : flow === "quote" ? text.submit : bookSubmit)}
         sending={text.sending}
         form={o.form}
         className={cn(callbackPreset ? cn(c?.submit, c?.callbackSubmit) : c?.submit, o.className)}
@@ -596,36 +672,37 @@ export function LeadCapture(props: LeadCaptureProps) {
   const contactShown = layout === "single" || (need !== undefined && !editing);
   const contactClass = contactShown ? "flex" : "hidden group-has-[[data-need-option]:checked]/lead:flex";
 
-  const stepView = (step: StepId): StepView => {
-    switch (step) {
-      case "intro": {
-        const chosen = intro?.options.find(o => o.value === introValue);
+  /** One question of a screen: what the chip says it asked and was answered (`null` while open), and its field. */
+  const questionView = (question: string): { label: string; value: string | null; node: ReactNode } => {
+    switch (question) {
+      case "intro":
         return {
-          id: step,
           label: intro?.label ?? "",
           value: chosen?.label ?? null,
           node: intro && (
             <IntroField
+              key="intro"
               intro={intro}
               value={introValue}
-              onPick={(v, radio) => moveOn(() => (setIntro(v), stepper.next()), radio, false)}
+              requiredText={text.required}
+              onPick={(v, radio) => moveOn(() => (setIntro(v), tapMovesOn("intro") ? stepper.next() : pin()), radio, false)}
               onSelect={stay(setIntro)}
-              // On a screen of its own, a question is its heading: never only for assistive technology.
+              // On a screen, a question is its heading: never only for assistive technology.
               classNames={props.classNames}
             />
           ),
         };
-      }
       case "need":
         return {
-          id: step,
           label: text.needLabel,
           value: needLabel ?? null,
           node: (
             <NeedField
+              key="need"
               display={needDisplay === "select" ? "tiles" : needDisplay}
               name={wire.subject}
               needs={needs}
+              prices={prices}
               need={need}
               editing
               hydrated={hydrated}
@@ -640,73 +717,91 @@ export function LeadCapture(props: LeadCaptureProps) {
             />
           ),
         };
-      case "locality":
+      case "slot": {
+        const part = slotPart && { morning: flowText.partMorning, afternoon: flowText.partAfternoon, evening: flowText.partEvening }[slotPart];
+        const day = slotDayShown && new Intl.DateTimeFormat(locale, { weekday: "short", day: "numeric" }).format(new Date(`${slotDayShown}T12:00:00`));
+        const answer = (set: () => void, radio: HTMLInputElement | null) => (radio ? moveOn(() => (set(), pin()), radio, false) : (set(), pin()));
         return {
-          id: step,
-          label: text.localityLabel,
-          value: localityShown ?? null,
+          label: `${flowText.preferDay} · ${flowText.preferPart}`,
+          value: day && part ? `${day} · ${part}` : null,
           node: (
-            <>
-              {localityField}
-              <Button type="button" size="touch" data-lead-chrome="" className={cn("w-full", c?.stepNext)} onClick={continueLocality}>
-                {flowText.stepNext}
-              </Button>
-            </>
+            <SlotField
+              key="slot"
+              now={now}
+              from={chosen?.slot === "later" ? 1 : 0}
+              locale={locale}
+              text={flowText}
+              day={slotDayShown}
+              part={slotPart}
+              dayAsked
+              required={hydrated}
+              enterPicks
+              onDay={(v, radio) => answer(() => setSlotDay(v), radio)}
+              onPart={(v, radio) => answer(() => setSlotPart(v), radio)}
+              classNames={props.classNames}
+            />
           ),
         };
+      }
+      case "locality":
+        return { label: text.localityLabel, value: localityShown ?? null, node: <Fragment key="locality">{localityField}</Fragment> };
+      case "name":
+        return { label: text.nameLabel, value: typed.name || null, node: <Fragment key="name">{nameField}</Fragment> };
       case "phone":
-        return {
-          id: step,
-          label: text.phoneLabel,
-          value: null,
-          node: callbackPreset ? (
-            <>
-              <input type="hidden" name={CHANNEL_FIELD} value="callback" />
-              {phone}
-              <ConsentField sentence={text.callbackConsent} requiredText={text.consentRequired} error={at("consent")} className={c?.consent} classNames={c} />
-              {tail}
-            </>
-          ) : (
-            <>
-              {priceShown}
-              {photos}
-              {props.localityStep === "with-phone" && localityField}
-              {phone}
-              {nameField}
-              <Fragment key="extras">{props.extras}</Fragment>
-              {tail}
-            </>
-          ),
-        };
+        return { label: text.phoneLabel, value: null, node: <Fragment key="phone">{phone}</Fragment> };
       default: {
-        const inputs = screenOf(step).flatMap(id => asked.filter(i => i.id === id));
-        const answerOf = (input: PricingInput) => {
-          const answer = estimate.answers[input.id];
-          const option = input.options.find(o => o.id === answer);
-          return answer === ESTIMATE_UNKNOWN ? flowText.estimateUnknown : option ? labelOf(option.labels, locale) : null;
-        };
-        const values = inputs.map(answerOf);
-        const first = inputs[0];
+        const input = asked.find(i => i.id === question);
+        const answer = estimate.answers[question];
+        const option = input?.options.find(o => o.id === answer);
         return {
-          id: step,
-          label: inputs.map(i => labelOf(i.labels, locale)).join(" · "),
-          value: values.length > 0 && values.every(v => v !== null) ? values.join(" · ") : null,
-          node: model && shownNeed !== undefined && first && (
-            <>
-              {inputs.map(input => (
-                <EstimateQuestionField key={input.id} model={model} need={shownNeed} input={input} question={props.questions?.[input.id]} {...estimateProps} />
-              ))}
-              {inputs.length > 1 && (
-                <Button type="button" size="touch" data-lead-chrome="" className={cn("w-full", c?.stepNext)} onClick={() => continueScreen(inputs.map(i => i.id))}>
-                  {props.questions?.[first.id]?.next ?? flowText.stepNext}
-                </Button>
-              )}
-            </>
-          ),
+          label: input ? labelOf(input.labels, locale) : question,
+          value: answer === ESTIMATE_UNKNOWN ? flowText.estimateUnknown : option ? labelOf(option.labels, locale) : null,
+          node: model && shownNeed !== undefined && input && <EstimateQuestionField key={question} model={model} need={shownNeed} input={input} question={props.questions?.[question]} {...estimateProps} />,
         };
       }
     }
   };
+  const stepView = (screen: Screen): StepView => {
+    const questions = screen.ask.map(questionView);
+    const values = questions.map(q => q.value);
+    const view = { id: screen.id, label: questions.map(q => q.label).join(" · "), value: values.every(v => v !== null) ? values.join(" · ") : null };
+    if (screen.id === "phone") {
+      return {
+        ...view,
+        value: null,
+        node: callbackPreset ? (
+          <>
+            <input type="hidden" name={CHANNEL_FIELD} value="callback" />
+            {phone}
+            <ConsentField sentence={text.callbackConsent} requiredText={text.consentRequired} error={at("consent")} className={c?.consent} classNames={c} />
+            {tail}
+          </>
+        ) : (
+          <>
+            {priceShown}
+            {photos}
+            {questions.map(q => q.node)}
+            <Fragment key="extras">{props.extras}</Fragment>
+            {tail}
+          </>
+        ),
+      };
+    }
+    return {
+      ...view,
+      node: (
+        <>
+          {questions.map(q => q.node)}
+          {!(screen.ask.length === 1 && tapMovesOn(screen.ask[0] ?? "")) && (
+            <Button key="next" type="button" size="touch" data-lead-chrome="" className={cn("w-full", c?.stepNext)} onClick={continueScreen}>
+              {screen.next ?? flowText.stepNext}
+            </Button>
+          )}
+        </>
+      ),
+    };
+  };
+  const screenHead = screens.find(s => s.id === stepper.current)?.head;
 
   return (
     <div ref={root} {...rootProps}>
@@ -718,7 +813,7 @@ export function LeadCapture(props: LeadCaptureProps) {
       */}
       <Fragment key="head">
         {slot("head") ||
-          (props.head ?? (
+          (screenHead ?? props.head ?? (
             <div className={cn("flex flex-col gap-1", c?.head)}>
               <p className={cn("font-serif text-2xl font-bold text-ink", c?.title)}>{text.title}</p>
               {/* `chip` says it in place of the lede. */}
@@ -748,7 +843,7 @@ export function LeadCapture(props: LeadCaptureProps) {
         {flow !== "quote" && repriced.shownCents !== undefined && <input type="hidden" name={SHOWN_CENTS_FIELD} value={repriced.shownCents} />}
         {steps ? (
           <LeadSteps
-            steps={stepIds.map(stepView)}
+            steps={screens.map(stepView)}
             current={stepper.current}
             total={total}
             onBack={() => moveOn(stepper.back, null, false)}
@@ -769,6 +864,7 @@ export function LeadCapture(props: LeadCaptureProps) {
               display={needDisplay}
               name={wire.subject}
               needs={needs}
+              prices={prices}
               need={need}
               editing={editing}
               hydrated={hydrated}

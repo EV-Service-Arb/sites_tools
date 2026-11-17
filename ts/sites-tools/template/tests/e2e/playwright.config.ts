@@ -24,7 +24,8 @@ export default defineConfig({
       env: { E2E_MOCK_PORT: String(MOCK_PORT) },
     },
     {
-      command: "node .next/standalone/server.js",
+      // The pages a previous run cached are the previous build's.
+      command: "rm -rf .next/standalone/.next/server/route-cache && node .next/standalone/server.js",
       cwd: "../..",
       url: `http://localhost:${PORT}/health`,
       reuseExistingServer: false,

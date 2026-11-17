@@ -7,7 +7,7 @@ import type { LeadIntro, StepId } from "./lead-steps";
 import { TileGroup } from "./LeadCaptureTiles";
 import type { PartClassNames } from "./parts";
 
-export type StepsPart = "progress" | "stepBack" | "step" | "answers" | "answer" | "intro" | "introOption" | "icon" | "label";
+export type StepsPart = "progress" | "stepBack" | "step" | "answers" | "answer" | "intro" | "introOptions" | "introOption" | "optionHint" | "icon" | "label";
 
 /** One screen: what it asks (the chip's label), what was answered (`null` while open), and the screen. */
 export interface StepView {
@@ -94,10 +94,15 @@ export function LeadSteps(props: {
   );
 }
 
-/** The intro question: a tile per answer, the brand's icon on it, posted under its `field`. Not required: a lead without it is still a lead. */
+/**
+ * The intro question: a tile per answer, the brand's icon and hint on it,
+ * posted under its `field`. Not required without a script — a lead without
+ * it is still a lead; with one, its screen's button asks for it (`requiredText`).
+ */
 export function IntroField(props: {
   intro: LeadIntro;
   value: string | undefined;
+  requiredText: string;
   onPick: (value: string, radio: HTMLInputElement) => void;
   onSelect: (value: string) => void;
   classNames?: PartClassNames<StepsPart> | undefined;
@@ -107,14 +112,15 @@ export function IntroField(props: {
     <TileGroup
       name={intro.field}
       legend={intro.label}
-      options={intro.options.map(o => ({ value: o.value, label: o.label, ...(o.icon !== undefined ? { icon: o.icon } : {}) }))}
+      options={intro.options.map(o => ({ value: o.value, label: o.label, hint: o.hint, ...(o.icon !== undefined ? { icon: o.icon } : {}) }))}
       value={props.value}
       required={false}
+      requiredText={props.requiredText}
       field={intro.field}
       enterPicks
       onPick={props.onPick}
       onSelect={props.onSelect}
-      classNames={{ field: c?.intro, legend: c?.label, grid: "grid grid-cols-1 gap-2", tile: cn("gap-3 px-4 py-3", c?.introOption), icon: c?.icon }}
+      classNames={{ field: c?.intro, legend: c?.label, grid: cn("grid grid-cols-1 gap-2", c?.introOptions), tile: cn("gap-3 px-4 py-3", c?.introOption), icon: c?.icon, hint: c?.optionHint }}
     />
   );
 }

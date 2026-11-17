@@ -204,7 +204,7 @@ describe.each(ENGINES)("LeadCapture's steps, tapped as in %s", engine => {
 
     it("asks an estimate one question a screen, prices it on the phone's screen, and posts every answer", () => {
       const { wrap, events } = recorder();
-      render(wrap(capture({ need: "standard", localityStep: "with-phone" })));
+      render(wrap(capture({ need: "standard", screens: [{ ask: ["locality", "phone"] }] })));
       expect(shown()).toEqual(["estimate_zone"]);
       tap(radio("estimate_zone", "centre"));
       tap(radio("estimate_bedrooms", "t3"));
@@ -276,24 +276,29 @@ describe.each(ENGINES)("LeadCapture's steps, tapped as in %s", engine => {
 
 describe.each(ENGINES)("LeadCapture's steps, questions sharing a screen, tapped as in %s", engine => {
   const tap = tapIn(engine);
-    const questions = { bedrooms: { step: 1, next: "Voir les prix" }, surface: { step: 1, shortLabels: { s40: "< 40" }, unknown: true, unknownSpan: 2 as const } };
+    const questions = { surface: { shortLabels: { s40: "< 40" }, unknown: true, unknownSpan: 2 as const } };
+    const screens = [{ ask: ["bedrooms", "surface"], next: "Voir les prix" }];
 
-    it("moves on once every question of the screen is answered; until then its button says what is missing", () => {
-      render(capture({ need: "standard", questions }));
+    it("stays while its questions are answered, and moves on by its button only, which says what is missing", () => {
+      render(capture({ need: "standard", questions, screens }));
       tap(radio("estimate_zone", "centre"));
       expect(shown()).toEqual(["estimate_bedrooms"]);
       tap(radio("estimate_bedrooms", "t3"));
       expect(shown()).toEqual(["estimate_bedrooms"]);
       expect(document.activeElement).toBe(radio("estimate_surface", "s40"));
       const next = screen.getByRole("button", { name: "Voir les prix" });
-      expect(next).toBeTruthy();
+      fireEvent.click(next);
+      expect(shown()).toEqual(["estimate_bedrooms"]);
       tap(radio("estimate_surface", "s70"));
+      // Every answer given: still the screen, for one to be changed.
+      expect(shown()).toEqual(["estimate_bedrooms"]);
+      fireEvent.click(next);
       expect(shown()).toEqual(["estimate_frequency"]);
       expect(screen.getByRole("button", { name: /Chambres · Surface, 2 chambres · 40 à 70 m²/ })).toBeTruthy();
     });
 
     it("draws a short label on a phone, names the radio in full, and lets \"I don't know\" take two columns", () => {
-      render(capture({ need: "standard", questions, classNames: { estimateUnknown: "brand-unknown" } }));
+      render(capture({ need: "standard", questions, screens, classNames: { estimateUnknown: "brand-unknown" } }));
       const s40 = radio("estimate_surface", "s40");
       expect(s40).toHaveAttribute("aria-label", "Moins de 40 m²");
       expect(s40.nextElementSibling?.querySelector(".sm\\:hidden")).toHaveTextContent("< 40");

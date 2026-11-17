@@ -61,17 +61,23 @@ export function LocalityField(props: {
   hydrated: boolean;
   /** The postcode the page already knows (`?postcode=`), over the one the place fills in. */
   preset?: string | undefined;
+  /**
+   * The street address, not a postcode: the browser's address autofill and
+   * the letters' keyboard, and nothing filled in or offered — a commune is
+   * not an address.
+   */
+  address: boolean;
   classNames?: PartClassNames<FieldPart> | undefined;
 }) {
   const { name, label, servedLabel, served, optional, hydrated, classNames: c } = props;
   const messageId = useId();
   const validity = useValidity(required(props.requiredText, props.required));
   const error = props.error ?? validity.shown;
-  const chips = hydrated && served.length > 1 && served.length <= MAX_CHIPS;
+  const chips = !props.address && hydrated && served.length > 1 && served.length <= MAX_CHIPS;
   // A commune's name filled in or a tap away must stay editable: iOS's numeric
   // keypad has no letters, so the keypad follows what the field is offered.
   // A list too long for chips offers nothing — the visitor types a postcode.
-  const numeric = served.length > MAX_CHIPS || served.every(s => POSTCODE.test(s));
+  const numeric = !props.address && (served.length > MAX_CHIPS || served.every(s => POSTCODE.test(s)));
   return (
     <Field className={cn("flex flex-col gap-2", c?.field)}>
       <FieldLabel className={c?.label}>{optionalLabel(label, props.required ? null : optional)}</FieldLabel>
@@ -80,11 +86,11 @@ export function LocalityField(props: {
         name={name}
         size="lg"
         inputMode={numeric ? "numeric" : "text"}
-        autoComplete="postal-code"
+        autoComplete={props.address ? "street-address" : "postal-code"}
         placeholder={props.placeholder}
         enterKeyHint="next"
         required={props.required}
-        defaultValue={props.preset ?? (served.length === 1 ? served[0] : undefined)}
+        defaultValue={props.address ? undefined : (props.preset ?? (served.length === 1 ? served[0] : undefined))}
         data-lead-field="locality"
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? messageId : undefined}

@@ -52,6 +52,7 @@ export function defaultLeadMail(brand: Pick<BrandFacts, "name">, lead: Lead, id:
       `Subject  : ${shownOf(lead, options.needLabel).need}`,
       `Locality : ${lead.locality}`,
       `Mobile   : ${lead.mobile || (messenger ? `(none — answer on ${messenger})` : "")}`,
+      ...(lead.preference ? [`Slot     : ${[lead.preference.date, lead.preference.part].filter(Boolean).join(" ")}`] : []),
       ...Object.entries(lead.extras).map(([name, value]) => `${name} : ${value}`),
     ].join("\n"),
   };

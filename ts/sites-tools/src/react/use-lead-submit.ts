@@ -2,7 +2,8 @@
 
 import { useRef, useState, type FormEvent, type FormEventHandler } from "react";
 import { ANALYTICS_ID_FIELD } from "../core/accept";
-import type { SiteChannel } from "@evinvest/sites-contract";
+import { DAY_PARTS, type SiteChannel } from "@evinvest/sites-contract";
+import type { SlotPreference } from "../core/lead";
 import { CHANNEL_FIELD, SUBMISSION_FIELD } from "../core/lead";
 import { THANKS } from "../core/routing";
 import { useAnalyticsId } from "./analytics-context";
@@ -20,6 +21,13 @@ export interface LeadSent {
   phone: string;
   /** The name field's value, when the form has one and it was filled. */
   name: string | null;
+  /**
+   * Every field the form posted with a value, by name — the need, the intro's
+   * answer, the brand's extras — for a success that names them.
+   */
+  fields: Readonly<Record<string, string>>;
+  /** The slot the server kept with the lead, when the card asked one; a refused one is not here. */
+  slot?: SlotPreference;
   /** The lead's public reference, as the route answered it (`leadRef`), for a `booking` to name the lead. */
   lead?: string;
   /** The price the server took the lead at, for an `estimate` or `fixed` need. */
@@ -93,7 +101,17 @@ export function postInBackground(form: HTMLFormElement, extra: Readonly<Record<s
   );
 }
 
-type Answer = { ok: true; location: string; lead?: string; cents?: number } | { ok: false; field: string; cents?: number };
+type Answer = { ok: true; location: string; lead?: string; cents?: number; slot?: SlotPreference } | { ok: false; field: string; cents?: number };
+
+/** The route's `slot`, read as the contract's day and part — anything else is none. */
+function slotOf(v: unknown): SlotPreference | null {
+  if (typeof v !== "object" || v === null) return null;
+  const { date, part } = v as Record<string, unknown>;
+  const day = typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : undefined;
+  const known = DAY_PARTS.find(p => p === part);
+  if (day === undefined && known === undefined) return null;
+  return { ...(day !== undefined ? { date: day } : {}), ...(known !== undefined ? { part: known } : {}) };
+}
 
 const LEAD_REF = /^lead-\d+-[0-9a-f]{8}$/;
 
@@ -113,13 +131,15 @@ async function readAnswer(res: Response): Promise<Answer | null> {
       throw error;
     });
     if (typeof body !== "object" || body === null) return null;
-    const { ok, location, field, lead, cents } = body as Record<string, unknown>;
+    const { ok, location, field, lead, cents, slot } = body as Record<string, unknown>;
     if (ok === true && typeof location === "string" && OWN_PATH.test(location)) {
+      const kept = slotOf(slot);
       return {
         ok,
         location,
         ...(typeof lead === "string" && LEAD_REF.test(lead) ? { lead } : {}),
         ...(typeof cents === "number" && Number.isSafeInteger(cents) && cents >= 0 ? { cents } : {}),
+        ...(kept ? { slot: kept } : {}),
       };
     }
     // `cents`: with `price_changed`, the price the lead would be taken at now.
@@ -193,7 +213,9 @@ export function useLeadSubmit(done: boolean | ((channel: FormChannel) => boolean
       const value = field === undefined ? null : data.get(field);
       return typeof value === "string" ? value.trim() : "";
     };
-    const lead: LeadSent = { channel: read(CHANNEL_FIELD) === "callback" ? "callback" : "form", phone: read(fields.mobile), name: read(fields.name) || null };
+    const posted: Record<string, string> = {};
+    for (const [key, value] of data) if (typeof value === "string" && value.trim() !== "") posted[key] = value.trim();
+    const lead: LeadSent = { channel: read(CHANNEL_FIELD) === "callback" ? "callback" : "form", phone: read(fields.mobile), name: read(fields.name) || null, fields: posted };
     setBusy(lead.channel);
     setFailure(null);
     const settle = () => {
@@ -222,7 +244,7 @@ export function useLeadSubmit(done: boolean | ((channel: FormChannel) => boolean
           minted.delete(form);
           const submission = data.get(SUBMISSION_FIELD);
           const ref = answer.lead && typeof submission === "string" && submission !== "" ? { lead: answer.lead, submission } : answer.lead ? { lead: answer.lead } : {};
-          if (typeof done === "function" ? done(lead.channel) : done) setSent({ ...lead, ...ref, ...(answer.cents !== undefined ? { cents: answer.cents } : {}) });
+          if (typeof done === "function" ? done(lead.channel) : done) setSent({ ...lead, ...ref, ...(answer.cents !== undefined ? { cents: answer.cents } : {}), ...(answer.slot ? { slot: answer.slot } : {}) });
           else navigation.assign(answer.location);
         },
         () => {

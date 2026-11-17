@@ -9,6 +9,8 @@ export interface TileOption {
   label: string;
   /** Drawn instead of `label` on a phone (under `sm`); the radio is still named by the whole `label`. */
   shortLabel?: string | undefined;
+  /** A line under the label ("env. 45 min"). */
+  hint?: string | undefined;
   /** Two columns of the grid (an "I don't know" under a row of answers). */
   span?: 2 | undefined;
   /** More classes for this tile alone, after the group's. */
@@ -39,7 +41,19 @@ export interface TileGroupProps {
   onPick: (value: string, radio: HTMLInputElement) => void;
   /** An arrow key moved the choice: chosen, but the visitor is still choosing. */
   onSelect: (value: string) => void;
-  classNames: { field?: string | undefined; legend?: string | undefined; grid?: string | undefined; tile?: string | undefined; icon?: string | undefined; badge?: string | undefined; aside?: string | undefined };
+  classNames: { field?: string | undefined; legend?: string | undefined; grid?: string | undefined; tile?: string | undefined; icon?: string | undefined; hint?: string | undefined; badge?: string | undefined; aside?: string | undefined };
+}
+
+function label(o: TileOption): ReactNode {
+  if (o.shortLabel === undefined) return <span className="min-w-0">{o.label}</span>;
+  return (
+    <>
+      <span aria-hidden="true" className="min-w-0 sm:hidden">
+        {o.shortLabel}
+      </span>
+      <span className="min-w-0 max-sm:hidden">{o.label}</span>
+    </>
+  );
 }
 
 /**
@@ -105,7 +119,7 @@ export function TileGroup(props: TileGroupProps) {
               // The whole tile: without a size WebKit keeps a radio 12×12 in its corner.
               className="peer absolute inset-0 m-0 size-full cursor-pointer opacity-0"
               data-lead-field={field}
-              aria-label={o.shortLabel !== undefined ? [o.label, o.badge, o.aside].filter(Boolean).join(", ") : undefined}
+              aria-label={o.shortLabel !== undefined ? [o.label, o.hint, o.badge, o.aside].filter(Boolean).join(", ") : undefined}
               {...markerProps}
             />
             <span
@@ -121,15 +135,13 @@ export function TileGroup(props: TileGroupProps) {
                   {o.icon}
                 </span>
               )}
-              {o.shortLabel !== undefined ? (
-                <>
-                  <span aria-hidden="true" className="min-w-0 sm:hidden">
-                    {o.shortLabel}
-                  </span>
-                  <span className="min-w-0 max-sm:hidden">{o.label}</span>
-                </>
+              {o.hint !== undefined ? (
+                <span className="flex min-w-0 flex-col">
+                  {label(o)}
+                  <span className={cn("text-sm text-ink-soft", c.hint)}>{o.hint}</span>
+                </span>
               ) : (
-                <span className="min-w-0">{o.label}</span>
+                label(o)
               )}
               {o.badge && <span className={cn("rounded-full bg-hover px-2 py-0.5 text-xs font-medium text-ink", c.badge)}>{o.badge}</span>}
               {o.aside && <span className={cn("ms-auto shrink-0 font-medium tabular-nums", c.aside)}>{o.aside}</span>}

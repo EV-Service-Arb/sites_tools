@@ -2,7 +2,7 @@ import "server-only";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
-import { SITE_CHANNELS } from "@evinvest/sites-contract";
+import { DAY_PARTS, SITE_CHANNELS } from "@evinvest/sites-contract";
 import { channelOf, LEAD_SCHEMA_VERSION, type Lead, type LeadPrice, type LeadStore, type SpamVerdict } from "../core/lead";
 import { LEAD_FLOWS, type LeadFlow } from "@evinvest/sites-contract";
 
@@ -90,6 +90,12 @@ const STEPS: readonly ((db: DatabaseSync) => void)[] = [
   // operator finds the lead from the message. Nullable: a row from before, a
   // lead from a card without a reference.
   db => db.exec("ALTER TABLE leads ADD COLUMN message_ref TEXT"),
+  // 9 — the slot the visitor prefers, asked before the contact: a day
+  // (`YYYY-MM-DD`) and a part of the day. Nullable: not asked, or not answered.
+  db => {
+    db.exec("ALTER TABLE leads ADD COLUMN preferred_date TEXT");
+    db.exec("ALTER TABLE leads ADD COLUMN preferred_part TEXT");
+  },
 ];
 
 if (STEPS.length !== LEAD_SCHEMA_VERSION) {
@@ -129,6 +135,8 @@ function leadOf(row: unknown): Lead {
   const flow = LEAD_FLOWS.find(f => f === str(row, "flow")) satisfies LeadFlow | undefined;
   const price = priceOf(row);
   const messageRef = str(row, "message_ref");
+  const date = str(row, "preferred_date");
+  const part = DAY_PARTS.find(p => p === str(row, "preferred_part"));
   return {
     subject: str(row, "job") ?? "",
     locality: str(row, "zip") ?? "",
@@ -142,6 +150,7 @@ function leadOf(row: unknown): Lead {
     ...(flow !== undefined ? { flow } : {}),
     ...(price !== null ? { price } : {}),
     ...(messageRef !== null ? { messageRef } : {}),
+    ...(date !== null || part !== undefined ? { preference: { ...(date !== null ? { date } : {}), ...(part !== undefined ? { part } : {}) } } : {}),
   };
 }
 
@@ -223,10 +232,10 @@ export function openSqliteLeadStore(path: string): SqliteLeadStore {
     throw error;
   }
   const insert = db.prepare(
-    "INSERT INTO leads (job, zip, mobile, location_id, spam_verdict, extras, channel, consent_at, consent_text, submission_id, flow, quoted_cents, pricing_valid_from, estimate_inputs, message_ref) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+    "INSERT INTO leads (job, zip, mobile, location_id, spam_verdict, extras, channel, consent_at, consent_text, submission_id, flow, quoted_cents, pricing_valid_from, estimate_inputs, message_ref, preferred_date, preferred_part) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
   );
   const bySubmission = db.prepare(
-    "SELECT id, job, zip, mobile, location_id, spam_verdict, extras, channel, consent_at, consent_text, submission_id, flow, quoted_cents, pricing_valid_from, estimate_inputs, message_ref FROM leads WHERE submission_id = ?",
+    "SELECT id, job, zip, mobile, location_id, spam_verdict, extras, channel, consent_at, consent_text, submission_id, flow, quoted_cents, pricing_valid_from, estimate_inputs, message_ref, preferred_date, preferred_part FROM leads WHERE submission_id = ?",
   );
   const count = db.prepare("SELECT COUNT(*) AS n FROM leads");
   return {
@@ -249,6 +258,8 @@ export function openSqliteLeadStore(path: string): SqliteLeadStore {
           lead.price?.validFrom ?? null,
           lead.price?.inputs ? JSON.stringify(lead.price.inputs) : null,
           lead.messageRef ?? null,
+          lead.preference?.date ?? null,
+          lead.preference?.part ?? null,
         ),
         "id",
       );

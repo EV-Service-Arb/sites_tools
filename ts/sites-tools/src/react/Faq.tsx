@@ -14,17 +14,19 @@ export interface FaqProps {
   items: readonly QuestionAnswer[];
   head?: ReactNode;
   id?: string;
+  /** The item drawn open, by index: the rest start closed. */
+  open?: number;
   className?: string;
   classNames?: PartClassNames<FaqPart>;
 }
 
-export function Faq({ items, head, id = "faq", className, classNames: c }: FaqProps) {
+export function Faq({ items, head, id = "faq", open, className, classNames: c }: FaqProps) {
   return (
     <div id={id} className={cn("flex flex-col gap-6 md:gap-11", className)}>
       {head}
       <div className={cn("overflow-hidden rounded-xl border border-border bg-background", c?.list)}>
-        {items.map(item => (
-          <details key={item.q} className={cn("group border-b border-border last:border-b-0", c?.item)}>
+        {items.map((item, i) => (
+          <details key={item.q} open={i === open} className={cn("group border-b border-border last:border-b-0", c?.item)}>
             <summary className={cn("flex cursor-pointer list-none items-start gap-4 px-5 py-5 md:px-8 md:py-6 [&::-webkit-details-marker]:hidden", c?.summary)}>
               <span className={partWithLeading("flex-1 font-serif text-lg font-bold text-ink", "leading-snug", c?.question)}>{item.q}</span>
               <span className={cn("text-lg text-primary-ink transition-transform group-open:rotate-45", c?.icon)} aria-hidden="true">

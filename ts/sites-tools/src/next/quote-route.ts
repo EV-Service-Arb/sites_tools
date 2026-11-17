@@ -23,8 +23,9 @@ import type { PricingSource } from "../server/pricing-source";
  * A refused lead goes back to its card with the field to fix
  * (`/fr?lead_error=phone#devis`); a script asking for JSON (`Accept:
  * application/json`) is answered `422 { ok: false, field }` instead, and
- * `200 { ok: true, location, lead, cents? }` for a lead taken — `lead` its
- * public reference (`leadRef`), `cents` the price the server took it at.
+ * `200 { ok: true, location, lead, cents?, slot? }` for a lead taken — `lead`
+ * its public reference (`leadRef`), `cents` the price the server took it at,
+ * `slot` the preferred slot it kept (`{ date?, part? }`).
  *
  * ```ts
  * export const dynamic = "force-dynamic";
@@ -273,7 +274,8 @@ export function quoteRoute<L extends string, P extends string>(
       case "stored": {
         const location = href(request, outcome.lead.placeSlug, outcome.locale, thanksSuffix(channelOf(outcome.lead)));
         const price = outcome.lead.price ? { cents: outcome.lead.price.cents } : {};
-        return scripted ? json(200, { ok: true, location, lead: outcome.ref, ...price }) : seeOther(location);
+        const slot = outcome.lead.preference ? { slot: outcome.lead.preference } : {};
+        return scripted ? json(200, { ok: true, location, lead: outcome.ref, ...price, ...slot }) : seeOther(location);
       }
       case "invalid": {
         const tags = submitTagsOf(form);

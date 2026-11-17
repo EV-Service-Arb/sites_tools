@@ -1,4 +1,5 @@
-import { isPageProvider, type BookingConfig, type PageProvider } from "@evinvest/sites-contract";
+import { bookingRequested, isPageProvider, preferredDateInWindow, type BookingConfig, type PageProvider } from "@evinvest/sites-contract";
+import type { SlotPreference } from "../lead";
 
 /**
  * Booking, the site's half: which of a place's providers a visitor is offered.
@@ -50,4 +51,24 @@ export function bookingOf(place: { booking?: BookingConfig | undefined }, varian
     return page ? { provider, url: page.url } : null;
   };
   return pick(variant) ?? pick(booking.default) ?? { provider: "manual" };
+}
+
+/** The fields a slot preference is posted under, with the lead (`slot` in the steps) or alone (`manual`, after it). */
+export const PREFERRED_DATE_FIELD = "preferred_date";
+export const PREFERRED_PART_FIELD = "preferred_part";
+
+/**
+ * The slot preference a lead was posted with, held to `booking.requested@1`'s
+ * own rules (a real day in the panel's window from `today`, a part of the day
+ * it knows): `undefined` when none was posted, `null` when what was posted is
+ * not one — a stale or forged page.
+ */
+export function postedPreference(read: (name: string) => string | null, today: string): SlotPreference | null | undefined {
+  const date = read(PREFERRED_DATE_FIELD) || undefined;
+  const part = read(PREFERRED_PART_FIELD) || undefined;
+  if (date === undefined && part === undefined) return undefined;
+  // The contract's check of the event's properties; the lead's ref, which it needs, is not minted before the insert.
+  const checked = bookingRequested({ lead_ref: "lead-1-00000000", provider: "manual", ...(date !== undefined ? { preferred_date: date } : {}), ...(part !== undefined ? { preferred_part: part } : {}) });
+  if (!checked || (checked.preferred_date !== undefined && !preferredDateInWindow(checked.preferred_date, today))) return null;
+  return { ...(checked.preferred_date !== undefined ? { date: checked.preferred_date } : {}), ...(checked.preferred_part !== undefined ? { part: checked.preferred_part } : {}) };
 }

@@ -78,10 +78,19 @@ export function describeLeadStoreContract(name: string, harness: () => LeadStore
       const priced = lead({ submissionId: "7c9e6679-7425-40de-944b-e07fc1f90ae7", flow: "estimate", price: { cents: 8400, validFrom: "2026-10-01", inputs: { zone: "proche" } } });
       const pricedId = await store.insert(priced);
       expect(await store.findSubmission("7c9e6679-7425-40de-944b-e07fc1f90ae7")).toEqual({ id: pricedId, lead: { ...priced, channel: "form" } });
+      // …and with the slot it was asked for, whole or in part.
+      for (const [sid, preference] of [
+        ["0b8f9d3a-1c2e-4a5b-8c6d-7e8f9a0b1c2d", { date: "2026-11-18", part: "afternoon" }],
+        ["1c9fae4b-2d3f-4b6c-9d7e-8f9a0b1c2d3e", { part: "morning" }],
+      ] as const) {
+        const slotted = lead({ submissionId: sid, flow: "fixed", price: { cents: 10900, validFrom: "2026-11-17" }, preference });
+        const slottedId = await store.insert(slotted);
+        expect(await store.findSubmission(sid)).toEqual({ id: slottedId, lead: { ...slotted, channel: "form" } });
+      }
       // Leads without one (the no-JS post) never collide.
       await store.insert(lead());
       await store.insert(lead());
-      expect(await store.count()).toBe(4);
+      expect(await store.count()).toBe(6);
       await store.close();
     });
 

@@ -49,7 +49,7 @@ export function useMessage(kit: MessengerKit, own?: string | null): Message {
   useEffect(() => {
     const form = formOf(kit);
     if (!form) return;
-    const read = () => setPostcode(valueOf(form, kit.wire.locality));
+    const read = () => setPostcode(kit.address ? "" : valueOf(form, kit.wire.locality));
     read();
     form.addEventListener("input", read);
     form.addEventListener("change", read);
@@ -57,7 +57,7 @@ export function useMessage(kit: MessengerKit, own?: string | null): Message {
       form.removeEventListener("input", read);
       form.removeEventListener("change", read);
     };
-  }, [kit.id, kit.wire.locality]);
+  }, [kit.id, kit.wire.locality, kit.address]);
   const words = wordsOf(kit);
   // The need with the estimate's answers: «Ménage standard · 2 ch. · 40–70 m²».
   const need = kit.needLabel ? [kit.needLabel, ...kit.answers].join(" · ") : null;
@@ -66,7 +66,7 @@ export function useMessage(kit: MessengerKit, own?: string | null): Message {
   const ref = kit.messageRef ? fillText(words.messageRef, { ref: kit.messageRef }) : null;
   const price = kit.priceText ? fillText(words.messengerPreviewPrice, { price: kit.priceText }) : null;
   const preview = [fillText(words.messageHello, { brand: kit.brand }), need, timing?.short, price, postcode, ref].filter(Boolean).join(" · ");
-  return { message: compose(postcode), preview, compose: () => compose(valueOf(formOf(kit), kit.wire.locality)) };
+  return { message: compose(postcode), preview, compose: () => compose(kit.address ? "" : valueOf(formOf(kit), kit.wire.locality)) };
 }
 
 /** Where a messenger CTA leads: wa.me with the message, or the bot with the reference. */
