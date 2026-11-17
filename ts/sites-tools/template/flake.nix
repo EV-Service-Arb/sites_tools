@@ -13,10 +13,11 @@
       let
         pkgs = import v_flakes.default_nixpkgs { inherit system; };
         sitePort = "59082";
+        pname = "brand-landing";
         landing = sites_tools.lib.mkLanding {
-          inherit pkgs v_flakes sitePort;
+          inherit pkgs v_flakes sitePort pname;
           root = ./.;
-          pname = "brand-landing";
+          e2ePort = "59089";
           # sites_panel's live data and the conductor's lead ingest, addressed by devops.
           connected = true;
           buildFiles = [
@@ -39,10 +40,24 @@
             quote = { location = "paris"; subject = "standard"; locality = "75011"; mobile = "0612345678"; };
           };
         };
+        # `nix run .#test` and errors.yml / warnings.yml, written by the dev shell
+        github = v_flakes.github {
+          inherit pkgs pname;
+          enable = true;
+          # not `inherit js`: a language module without `rs` makes the pre-commit install throw for want of a toolchain
+          jobs.errors.augment = landing.js.particles.errors ++ (with landing.particles; [ e2e-typecheck e2e checks container-smoke ]);
+          jobs.warnings.augment = landing.js.particles.warnings ++ [ landing.particles.npm-audit ];
+          gitignore.extra = builtins.readFile "${v_flakes}/files/gitignore/js.gitignore";
+        };
+        # v_flakes' own hook scripts run on cargo, which `combine` puts on PATH
+        combined = v_flakes.utils.combine { rust = v_flakes.rs.default_nightly system; modules = [ github landing.js ]; };
       in
       {
         inherit (landing) packages checks apps containers;
-        devShells.default = landing.devShell;
+        devShells.default = landing.devShell.overrideAttrs (old: {
+          shellHook = (old.shellHook or "") + combined.shellHook;
+          nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ combined.enabledPackages;
+        });
       }
     );
 }
