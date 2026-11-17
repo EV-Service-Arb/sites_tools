@@ -23,14 +23,15 @@
 
           github = v_flakes.github {
             inherit pkgs pname;
+            inherit js;
             enable = true;
-            # not `inherit js`: a language module without `rs` makes the pre-commit install throw for want of a toolchain
-            jobs.errors.augment = js.particles.errors ++ [
+            jobs.errors.default = true;
+            jobs.errors.augment = [
               sitesToolsPack
               { name = "sites-tools-visual"; program = sites-tools-visual-app; }
               { name = "checks"; builds = checks; }
             ] ++ pkgs.lib.optional pkgs.stdenv.hostPlatform.isLinux (mkLandingFixture.particles.container-smoke // { name = "mk-landing-smoke"; });
-            jobs.warnings.augment = js.particles.warnings;
+            jobs.warnings.default = true;
             gitignore.extra = ''
               ## Node / TypeScript
               **/node_modules

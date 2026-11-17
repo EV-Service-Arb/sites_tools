@@ -43,11 +43,12 @@
         # `nix run .#test` and errors.yml / warnings.yml, written by the dev shell
         github = v_flakes.github {
           inherit pkgs pname;
+          inherit (landing) js;
           enable = true;
-          # not `inherit js`: a language module without `rs` makes the pre-commit install throw for want of a toolchain
-          jobs.errors.augment = landing.js.particles.errors ++ (with landing.particles; [ e2e-typecheck e2e checks container-smoke ]);
-          jobs.warnings.augment = landing.js.particles.warnings ++ [ landing.particles.npm-audit ];
-          gitignore.extra = builtins.readFile "${v_flakes}/files/gitignore/js.gitignore";
+          jobs.errors.default = true;
+          jobs.errors.augment = with landing.particles; [ e2e-typecheck e2e checks container-smoke ];
+          jobs.warnings.default = true;
+          jobs.warnings.augment = [ landing.particles.npm-audit ];
         };
         # v_flakes' own hook scripts run on cargo, which `combine` puts on PATH
         combined = v_flakes.utils.combine { rust = v_flakes.rs.default_nightly system; modules = [ github landing.js ]; };

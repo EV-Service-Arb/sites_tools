@@ -83,6 +83,18 @@ graphify-out/
 **/.tb/
 **/.tb-client
 **/.pg/
+## JavaScript / Node
+./*/node_modules/
+**/node_modules/
+**/.pnpm-store/
+**/.pnpm-debug.log
+**/npm-debug.log*
+**/yarn-error.log
+**/dist/
+**/.next/
+**/.turbo/
+**/.cache/
+.direnv/corepack/
 ## Node / TypeScript
 **/node_modules
 **/dist/
