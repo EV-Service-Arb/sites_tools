@@ -9,6 +9,8 @@ export interface KitPhoto {
   id: number;
   width: number;
   height: number;
+  /** What it shows: its alt and caption; `null` while unlabelled. */
+  shows: string | null;
 }
 
 export interface KitDraft {
@@ -38,8 +40,9 @@ const isSize = isId;
 
 function photo(v: unknown): KitPhoto {
   const p = v as Partial<KitPhoto> | null;
-  if (!p || !isId(p.id) || !isSize(p.width) || !isSize(p.height)) fail(`a photo is not {id, width, height}: ${JSON.stringify(v)}`);
-  return { id: p.id, width: p.width, height: p.height };
+  if (!p || !isId(p.id) || !isSize(p.width) || !isSize(p.height) || !(p.shows === null || (typeof p.shows === "string" && p.shows.length <= 60)))
+    fail(`a photo is not {id, width, height, shows}: ${JSON.stringify(v)}`);
+  return { id: p.id, width: p.width, height: p.height, shows: p.shows };
 }
 
 function draft(v: unknown): KitDraft {

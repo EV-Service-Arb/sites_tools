@@ -21,6 +21,8 @@ const CSS = `
 .kit-meta{padding:0 16px 12px}
 .kit-photos{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:12px 16px;border-top:1px solid #e5e5e5;background:#fafafa}
 .kit-photos img{width:48px;height:48px;object-fit:cover;border-radius:8px;background:#e5e5e5}
+.kit-photos figure{margin:0;display:flex;flex-direction:column;align-items:center;gap:2px;max-width:72px}
+.kit-photos figcaption{font-size:11px;line-height:1.2;color:#666;text-align:center}
 .kit-save{all:unset;box-sizing:border-box;white-space:nowrap;cursor:pointer;flex:1 0 auto;justify-content:center;display:flex;align-items:center;gap:8px;padding:10px 12px;font-size:14px;border:1px solid #0a0a0a;border-radius:10px;background:#fff;font-weight:600}
 .kit-save:disabled{opacity:.4;cursor:default}
 .kit-push{flex:1}
@@ -160,7 +162,10 @@ function Drafts({ offer, os, link, base, w }: ReviewKitProps & { w: Words }) {
         {draft.photos.length > 0 && (
           <div className="kit-photos">
             {draft.photos.map(p => (
-              <img key={p.id} src={photoUrl(base, offer.view, p)} width={p.width} height={p.height} alt="" />
+              <figure key={p.id}>
+                <img src={photoUrl(base, offer.view, p)} width={p.width} height={p.height} alt={p.shows ?? ""} />
+                {p.shows !== null && <figcaption>{p.shows}</figcaption>}
+              </figure>
             ))}
             <SavePhotos os={os} base={base} view={offer.view} photos={draft.photos} label={w.save(draft.photos.length)} />
           </div>

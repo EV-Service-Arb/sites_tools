@@ -25,7 +25,7 @@ const OFFER: KitOffer = {
   review_uri: "https://www.google.com/maps/place//data=!4m3!3m2!1s0x1:0x2!12e1",
   view: VIEW,
   drafts: [
-    { id: 11, text: "Came on a Sunday.", photos: [{ id: 5, width: 2048, height: 1536 }] },
+    { id: 11, text: "Came on a Sunday.", photos: [{ id: 5, width: 2048, height: 1536, shows: "The new tap" }] },
     { id: 12, text: "Fair price.", photos: [] },
   ],
 };
